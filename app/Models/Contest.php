@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class Contest extends Model
 {
+    protected $fillable = [
+        'title',
+        'description',
+        'status',
+        'max_participants',
+        'prize'
+    ];
+
     public function entries()
     {
         return $this->hasMany(Entry::class);
