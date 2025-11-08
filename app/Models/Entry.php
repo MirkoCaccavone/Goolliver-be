@@ -14,8 +14,9 @@ class Entry extends Model
     protected $fillable = [
         'user_id',
         'contest_id',
-        'image_url',
-        'caption',
+        'image_path',
+        'description',
+        'status',
     ];
 
     // Relazioni
