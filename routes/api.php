@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContestController;
 use App\Http\Controllers\Api\EntryController;
 use App\Http\Controllers\Api\TransactionController;
@@ -44,4 +45,12 @@ Route::prefix('transactions')->group(function () {
     Route::post('/', [TransactionController::class, 'store']);          // nuova transazione
     Route::get('/{id}', [TransactionController::class, 'show']);        // singola transazione
     Route::delete('/{id}', [TransactionController::class, 'destroy']);  // elimina transazione
+});
+
+// Rotte AuthController
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
 });

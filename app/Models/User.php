@@ -2,34 +2,29 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-
-
-// Dati degli utenti
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * I campi assegnabili in massa
      */
     protected $fillable = [
         'name',
         'email',
         'password',
+        'phone',        // nuovo campo facoltativo
+        'provider',     // login tramite social (es. google, facebook)
+        'provider_id',  // ID univoco del provider
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
+     * I campi nascosti nelle risposte JSON
      */
     protected $hidden = [
         'password',
@@ -37,9 +32,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Tipi di cast automatici
      */
     protected function casts(): array
     {
@@ -49,6 +42,9 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Relazioni
+     */
     public function entries()
     {
         return $this->hasMany(Entry::class);
