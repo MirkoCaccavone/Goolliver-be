@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContestController;
 use App\Http\Controllers\Api\EntryController;
+use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\VoteController;
 use Illuminate\Http\Request;
@@ -54,3 +55,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
+
+// Rotte SocialAuthController
+Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirectToProvider']);
+Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback']);

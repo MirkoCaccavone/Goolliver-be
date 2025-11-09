@@ -13,12 +13,19 @@ class AuthController extends Controller
     // Registrazione
     public function register(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'phone' => 'nullable|string|max:20',
-        ]);
+        try {
+            $request->validate([
+                'name' => 'required|string|max:100',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|min:6',
+                'phone' => 'nullable|string|max:20',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Dati di registrazione non validi',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         $user = User::create([
             'name' => $request->name,
@@ -39,23 +46,54 @@ class AuthController extends Controller
     // Login
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Dati mancanti o non validi',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Credenziali non valide.'],
-            ]);
+        // Verifica se l'utente esiste
+        if (!$user) {
+            return response()->json([
+                'message' => 'Credenziali non valide',
+                'errors' => [
+                    'email' => ['Email non trovata.']
+                ]
+            ], 401);
+        }
+
+        // Verifica se l'utente ha una password (non è un utente social)
+        if (is_null($user->password)) {
+            return response()->json([
+                'message' => 'Account social',
+                'errors' => [
+                    'email' => ['Questo account è registrato tramite social login (' . ucfirst($user->provider) . '). Usa il login social.']
+                ]
+            ], 400);
+        }
+
+        // Verifica la password
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'message' => 'Credenziali non valide',
+                'errors' => [
+                    'password' => ['Password non corretta.']
+                ]
+            ], 401);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'Login effettuato',
+            'message' => 'Login effettuato con successo',
             'token' => $token,
             'user' => $user,
         ]);
