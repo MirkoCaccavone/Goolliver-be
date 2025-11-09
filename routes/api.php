@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EntryController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\VoteController;
+use App\Http\Controllers\EmailTestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -59,3 +60,18 @@ Route::middleware('auth:sanctum')->group(function () {
 // Rotte SocialAuthController
 Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirectToProvider']);
 Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback']);
+
+// Rotte Email Testing (per sviluppo)
+Route::prefix('email-test')->group(function () {
+    Route::post('/welcome', [EmailTestController::class, 'sendWelcomeEmail']);
+    Route::post('/new-contest', [EmailTestController::class, 'sendNewContestEmail']);
+    Route::post('/reminder', [EmailTestController::class, 'sendContestReminderEmail']);
+    Route::post('/test-all', [EmailTestController::class, 'sendTestEmails']);
+});
+
+// Rotte Email Preview (per visualizzare le email nel browser)
+Route::prefix('email-preview')->group(function () {
+    Route::get('/welcome', [App\Http\Controllers\EmailPreviewController::class, 'previewWelcome']);
+    Route::get('/new-contest', [App\Http\Controllers\EmailPreviewController::class, 'previewNewContest']);
+    Route::get('/reminder', [App\Http\Controllers\EmailPreviewController::class, 'previewReminder']);
+});
