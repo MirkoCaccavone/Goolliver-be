@@ -175,15 +175,67 @@
                 const result = await response.json();
 
                 if (response.ok) {
+                    const entry = result.entry || result.data;
+                    const moderationData = entry.metadata?.moderation || {};
+                    const score = entry.moderation_score || 0;
+
+                    let scoreClass = 'safe';
+                    if (score > 0.7) scoreClass = 'risky';
+                    else if (score > 0.3) scoreClass = 'moderate';
+
+                    let statusIcon = '✅';
+                    if (entry.moderation_status === 'rejected') statusIcon = '❌';
+                    else if (entry.moderation_status === 'pending_review') statusIcon = '⏳';
+                    else if (entry.moderation_status === 'pending') statusIcon = '🔍';
+
+                    const categoriesHtml = moderationData.categories ?
+                        Object.entries(moderationData.categories).map(([category, categoryScore]) =>
+                            `<div style="display: inline-block; margin: 2px; padding: 4px 8px; background: ${categoryScore > 0.5 ? '#ffebee' : '#e8f5e8'}; border-radius: 4px; font-size: 12px;">
+                                ${category}: ${(categoryScore * 100).toFixed(1)}%
+                            </div>`
+                        ).join('') : '';
+
                     resultDiv.className = 'result success';
                     resultDiv.innerHTML = `
                         <h4>✅ ${result.message}</h4>
-                        <strong>Dettagli:</strong><br>
-                        📷 ID: ${result.entry.id}<br>
-                        📝 Titolo: ${result.entry.title}<br>
-                        📊 Status: ${result.entry.processing_status}<br>
-                        🔍 Moderazione: ${result.entry.moderation_status}<br>
-                        📅 Creato: ${result.entry.created_at}
+                        
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <h5>🛡️ Risultati Moderazione AI</h5>
+                            <div style="font-size: 18px; margin: 8px 0;">
+                                ${statusIcon} <strong>Status:</strong> ${entry.moderation_status?.toUpperCase() || 'UNKNOWN'}
+                            </div>
+                            <div style="font-size: 16px; margin: 8px 0; color: ${score > 0.7 ? '#d32f2f' : score > 0.3 ? '#f57c00' : '#388e3c'};">
+                                📊 <strong>Punteggio Rischio:</strong> ${(score * 100).toFixed(1)}%
+                            </div>
+                            <div style="margin: 8px 0;">
+                                🤖 <strong>Provider:</strong> ${moderationData.provider || 'mock'}<br>
+                                ⚡ <strong>Tempo Analisi:</strong> ${moderationData.processing_time_ms || 0}ms<br>
+                                🎯 <strong>Confidenza:</strong> ${((moderationData.confidence || 0) * 100).toFixed(1)}%
+                            </div>
+                            
+                            ${moderationData.flagged_reasons && moderationData.flagged_reasons.length > 0 ?
+                            `<div style="margin: 10px 0;">
+                                    <strong>⚠️ Contenuti Rilevati:</strong><br>
+                                    ${moderationData.flagged_reasons.map(reason =>
+                                `<div style="color: #d32f2f; font-size: 14px;">• ${reason.description} (${(reason.score * 100).toFixed(1)}%)</div>`
+                            ).join('')}
+                                </div>` :
+                            '<div style="color: #4caf50; margin: 10px 0;">✅ <strong>Nessun contenuto inappropriato rilevato</strong></div>'
+                        }
+                            
+                            ${categoriesHtml ?
+                            `<div style="margin: 10px 0;">
+                                    <strong>� Categorie Analizzate:</strong><br>
+                                    ${categoriesHtml}
+                                </div>` : ''
+                        }
+                        </div>
+                        
+                        <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; font-size: 14px;">
+                            <strong>📷 Dettagli Foto:</strong><br>
+                            ID: ${entry.id} | Titolo: ${entry.title}<br>
+                            Dimensioni: ${(entry.file_size / 1024).toFixed(1)} KB | Tipo: ${entry.mime_type}
+                        </div>
                     `;
                 } else {
                     resultDiv.className = 'result error';
