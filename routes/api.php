@@ -3,16 +3,80 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContestController;
 use App\Http\Controllers\Api\EntryController;
+use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\VoteController;
 use App\Http\Controllers\EmailTestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 
 // Test
 Route::get('/test', function () {
     return response()->json(['message' => 'API Goolliver attive!']);
+});
+
+// System Test Routes
+Route::prefix('test')->group(function () {
+    // Debug endpoint
+    Route::get('/photo-debug', function () {
+        try {
+            $tests = [];
+
+            // Test 1: Storage directories
+            $tests['storage_directories'] = [
+                'photos' => is_dir(storage_path('app/public/photos')),
+                'thumbnails' => is_dir(storage_path('app/public/photos/thumbnails')),
+                'temp' => is_dir(storage_path('app/temp'))
+            ];
+
+            // Test 2: Required classes
+            $tests['required_classes'] = [
+                'PhotoService' => class_exists('\App\Services\PhotoService'),
+                'PhotoController' => class_exists('\App\Http\Controllers\Api\PhotoController'),
+                'PhotoUploadRequest' => class_exists('\App\Http\Requests\PhotoUploadRequest'),
+                'PhotoUploadException' => class_exists('\App\Exceptions\PhotoUploadException'),
+                'EntryPolicy' => class_exists('\App\Policies\EntryPolicy')
+            ];
+
+            // Test 3: Database structure (questo potrebbe essere il problema)
+            $tests['database_structure'] = [];
+            try {
+                $tests['database_structure']['entries_table'] = Schema::hasTable('entries');
+                $tests['database_structure']['moderation_score_column'] = Schema::hasColumn('entries', 'moderation_score');
+                $tests['database_structure']['processing_status_column'] = Schema::hasColumn('entries', 'processing_status');
+                $tests['database_structure']['file_size_column'] = Schema::hasColumn('entries', 'file_size');
+            } catch (\Exception $e) {
+                $tests['database_structure']['error'] = $e->getMessage();
+                $tests['database_structure']['trace'] = $e->getTraceAsString();
+            }
+
+            return response()->json([
+                'status' => 'DEBUG_SUCCESS',
+                'tests' => $tests
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'DEBUG_ERROR',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
+    });
+    Route::get('/system-status', [App\Http\Controllers\Api\SystemTestController::class, 'systemStatus']);
+    Route::get('/photo-system-test', [App\Http\Controllers\Api\SystemTestController::class, 'photoSystemTest']);
+    Route::get('/security-check', [App\Http\Controllers\Api\SystemTestController::class, 'securityCheck']);
+
+    // Photo Upload Test Routes
+    Route::prefix('photos')->group(function () {
+        Route::get('/page', [App\Http\Controllers\PhotoTestController::class, 'testPage']);
+        Route::post('/upload', [App\Http\Controllers\PhotoTestController::class, 'testUpload']);
+        Route::get('/storage-info', [App\Http\Controllers\PhotoTestController::class, 'storageInfo']);
+        Route::get('/list', [App\Http\Controllers\PhotoTestController::class, 'listPhotos']);
+    });
 });
 
 // 🔐 AUTENTICAZIONE WEB
@@ -66,6 +130,33 @@ Route::middleware(['throttle:5,1'])->post('/login', [AuthController::class, 'log
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // 📸 ROTTE PHOTO UPLOAD E GESTIONE
+    Route::prefix('photos')->group(function () {
+        // Upload nuova foto
+        Route::post('/upload', [PhotoController::class, 'upload'])
+            ->middleware(['throttle:5,1']); // Max 5 upload al minuto
+
+        // Gestione foto esistenti
+        Route::put('/{entry}', [PhotoController::class, 'update'])
+            ->middleware(['can:update,entry']);
+        Route::delete('/{entry}', [PhotoController::class, 'destroy'])
+            ->middleware(['can:delete,entry']);
+
+        // Visualizzazione foto
+        Route::get('/{entry}', [PhotoController::class, 'show']);
+
+        // Gallery e listing
+        Route::get('/contest/{contest}/gallery', [PhotoController::class, 'gallery']);
+        Route::get('/user/my-photos', [PhotoController::class, 'userPhotos']);
+
+        // Stato moderazione
+        Route::get('/{entry}/moderation-status', [PhotoController::class, 'moderationStatus'])
+            ->middleware(['can:view,entry']);
+
+        // Upload progress (per future implementazioni)
+        Route::get('/upload-progress', [PhotoController::class, 'uploadProgress']);
+    });
 });
 
 // Rotte SocialAuthController

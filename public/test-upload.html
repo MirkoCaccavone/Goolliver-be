@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Test Rapido Upload Foto - Goolliver</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .upload-form {
+            border: 2px dashed #ccc;
+            padding: 30px;
+            text-align: center;
+            border-radius: 8px;
+            background: #fafafa;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 Test Rapido Sistema Upload Foto</h1>
+        <p>Testa il sistema di upload foto di Goolliver con questo form semplificato.</p>
+
+        <!-- System Info -->
+        <div id="systemInfo" class="result info" style="display: block;">
+            <h3>📊 Stato Sistema</h3>
+            <div id="systemStatus">Caricamento...</div>
+        </div>
+
+        <!-- Upload Form -->
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="upload-form">
+                <h3>📸 Upload Foto</h3>
+
+                <label for="contest_id">Contest ID (usa 1 per default):</label>
+                <input type="number" id="contest_id" name="contest_id" value="1" required>
+
+                <label for="user_id">User ID (usa 1 per default):</label>
+                <input type="number" id="user_id" name="user_id" value="1" required>
+
+                <label for="title">Titolo Foto:</label>
+                <input type="text" id="title" name="title" value="Foto di Test" required>
+
+                <label for="description">Descrizione (opzionale):</label>
+                <textarea id="description" name="description" rows="2">Una bella foto di test per Goolliver</textarea>
+
+                <label for="photo">Seleziona Foto (JPG, PNG, WEBP - Max 10MB):</label>
+                <input type="file" id="photo" name="photo" accept="image/*" required>
+
+                <button type="submit" class="btn">🚀 Carica Foto</button>
+                <button type="button" class="btn" onclick="testAPI()">🔧 Test API</button>
+            </div>
+        </form>
+
+        <!-- Result -->
+        <div id="result" class="result"></div>
+
+        <!-- Quick Actions -->
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn" onclick="window.open('http://127.0.0.1:8000/api/test/system-status')">📊 System
+                Status</button>
+            <button class="btn" onclick="window.open('http://127.0.0.1:8000/api/test/photos/storage-info')">📁 Storage
+                Info</button>
+            <button class="btn" onclick="window.open('http://127.0.0.1:8000/api/test/photo-system-test')">🔍 Photo
+                Test</button>
+        </div>
+    </div>
+
+    <script>
+        // Carica info sistema
+        async function loadSystemInfo() {
+            try {
+                const response = await fetch('/api/test/system-status');
+                const data = await response.json();
+
+                let html = '<strong>✅ Sistema Operativo</strong><br>';
+                html += `🐘 PHP: ${data.server.php_version} | `;
+                html += `🔧 Laravel: ${data.server.laravel_version} | `;
+                html += `👥 Users: ${data.database.users_count} | `;
+                html += `🏆 Contests: ${data.database.contests_count}`;
+
+                document.getElementById('systemStatus').innerHTML = html;
+            } catch (error) {
+                document.getElementById('systemStatus').innerHTML = '❌ Errore nel caricamento stato sistema';
+            }
+        }
+
+        // Form upload
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.className = 'result info';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '⏳ Caricamento foto in corso...';
+
+            try {
+                const response = await fetch('/api/test/photos/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h4>✅ ${result.message}</h4>
+                        <strong>Dettagli:</strong><br>
+                        📷 ID: ${result.entry.id}<br>
+                        📝 Titolo: ${result.entry.title}<br>
+                        📊 Status: ${result.entry.processing_status}<br>
+                        🔍 Moderazione: ${result.entry.moderation_status}<br>
+                        📅 Creato: ${result.entry.created_at}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <h4>❌ Errore Upload</h4>
+                        <strong>Errore:</strong> ${result.error}<br>
+                        ${result.details ? '<pre>' + JSON.stringify(result.details, null, 2) + '</pre>' : ''}
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Errore di rete: ${error.message}`;
+            }
+        });
+
+        // Test API
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result info';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '🔧 Testando API...';
+
+            try {
+                // Test multiple endpoints
+                const tests = [
+                    { name: 'System Status', url: '/api/test/system-status' },
+                    { name: 'Storage Info', url: '/api/test/photos/storage-info' },
+                    { name: 'Photo System Test', url: '/api/test/photo-system-test' }
+                ];
+
+                let html = '<h4>🔧 Risultati Test API:</h4>';
+
+                for (const test of tests) {
+                    try {
+                        const response = await fetch(test.url);
+                        const status = response.ok ? '✅' : '❌';
+                        html += `${status} ${test.name}: ${response.status}<br>`;
+                    } catch (e) {
+                        html += `❌ ${test.name}: Errore di connessione<br>`;
+                    }
+                }
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Errore nel test API: ${error.message}`;
+            }
+        }
+
+        // Carica info sistema al caricamento pagina
+        document.addEventListener('DOMContentLoaded', loadSystemInfo);
+    </script>
+</body>
+
+</html>
