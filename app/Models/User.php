@@ -59,4 +59,28 @@ class User extends Authenticatable
     {
         return $this->hasMany(Transaction::class);
     }
+
+    /**
+     * Relazione con le notifiche
+     */
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class)->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Notifiche non lette
+     */
+    public function unreadNotifications()
+    {
+        return $this->hasMany(Notification::class)->unread()->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Conta notifiche non lette
+     */
+    public function getUnreadNotificationsCountAttribute()
+    {
+        return $this->unreadNotifications()->count();
+    }
 }

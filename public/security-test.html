@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>🧪 Goolliver Security Test Suite</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .test-button:hover {
+            background: #0056b3;
+        }
+
+        .danger {
+            background: #dc3545;
+        }
+
+        .danger:hover {
+            background: #c82333;
+        }
+
+        .success {
+            background: #28a745;
+        }
+
+        .success:hover {
+            background: #1e7e34;
+        }
+
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #e9ecef;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .success-result {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔒 Goolliver Security Test Suite</h1>
+
+        <!-- Test 1: Authentication -->
+        <div class="test-section">
+            <h2>🔐 Test 1: Authentication & Rate Limiting</h2>
+            <p>Test login con credenziali corrette e rate limiting</p>
+
+            <div>
+                <input type="email" id="testEmail" placeholder="Email" value="mario@example.com">
+                <input type="password" id="testPassword" placeholder="Password" value="123456">
+                <button class="test-button success" onclick="testLogin()">✅ Test Login Valido</button>
+                <button class="test-button danger" onclick="testBruteForce()">🚨 Test Brute Force (5 tentativi)</button>
+            </div>
+            <div id="authResult" class="result"></div>
+        </div>
+
+        <!-- Test 2: Authorization -->
+        <div class="test-section">
+            <h2>🛡️ Test 2: Authorization (Resource Ownership)</h2>
+            <p>Test accesso a notifiche di altri utenti</p>
+
+            <div>
+                <input type="text" id="authToken" placeholder="Token (ottenuto dal login)" style="width: 70%;">
+                <input type="number" id="notificationId" placeholder="ID Notifica" value="1" style="width: 25%;">
+                <button class="test-button" onclick="testAuthorization()">🔍 Test Accesso Notifica</button>
+                <button class="test-button danger" onclick="testUnauthorized()">🚫 Test Accesso Non Autorizzato</button>
+            </div>
+            <div id="authzResult" class="result"></div>
+        </div>
+
+        <!-- Test 3: Input Validation -->
+        <div class="test-section">
+            <h2>📝 Test 3: Input Validation & XSS Protection</h2>
+            <p>Test validazione input e protezione XSS</p>
+
+            <div>
+                <input type="text" id="xssTitle" placeholder="Titolo"
+                    value="<script>alert('XSS Test')</script>Titolo Normale">
+                <textarea id="xssMessage"
+                    placeholder="Messaggio">Questo è un test XSS: &lt;img src=x onerror=alert('XSS')&gt;</textarea>
+                <button class="test-button" onclick="testXSSProtection()">🛡️ Test Protezione XSS</button>
+            </div>
+            <div id="validationResult" class="result"></div>
+        </div>
+
+        <!-- Test 4: API Endpoints -->
+        <div class="test-section">
+            <h2>🚀 Test 4: API Security</h2>
+            <p>Test vari endpoint per sicurezza</p>
+
+            <button class="test-button" onclick="testAPIEndpoint('/api/test')">📡 Test API Base</button>
+            <button class="test-button" onclick="testAPIEndpoint('/api/notifications', true)">🔔 Test API
+                Notifiche</button>
+            <button class="test-button danger" onclick="testAPIEndpoint('/api/notifications/999', true)">🚫 Test
+                Notifica Inesistente</button>
+            <div id="apiResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentToken = '';
+
+        async function testLogin() {
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            const resultDiv = document.getElementById('authResult');
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentToken = data.token;
+                    document.getElementById('authToken').value = currentToken;
+                    resultDiv.className = 'result success-result';
+                    resultDiv.innerHTML = `✅ Login riuscito!<br>Token: ${currentToken.substring(0, 20)}...`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Login fallito: ${data.message || 'Errore sconosciuto'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Errore di rete: ${error.message}`;
+            }
+        }
+
+        async function testBruteForce() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.innerHTML = '🔄 Testing brute force protection...';
+
+            let attempts = 0;
+            const maxAttempts = 6;
+
+            for (let i = 0; i < maxAttempts; i++) {
+                try {
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            email: 'test@test.com',
+                            password: 'wrong_password_' + i
+                        })
+                    });
+
+                    attempts++;
+
+                    if (response.status === 429) {
+                        resultDiv.className = 'result success-result';
+                        resultDiv.innerHTML = `✅ Rate limiting funziona! Bloccato dopo ${attempts} tentativi.<br>Status: ${response.status} - Too Many Requests`;
+                        return;
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 200)); // Pausa tra tentativi
+
+                } catch (error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Errore durante test: ${error.message}`;
+                    return;
+                }
+            }
+
+            resultDiv.className = 'result error';
+            resultDiv.innerHTML = `⚠️ Rate limiting non funziona - completati ${attempts} tentativi senza blocco`;
+        }
+
+        async function testAuthorization() {
+            const token = document.getElementById('authToken').value || currentToken;
+            const notifId = document.getElementById('notificationId').value;
+            const resultDiv = document.getElementById('authzResult');
+
+            if (!token) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '❌ Token mancante. Fai prima il login.';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/notifications/${notifId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.className = 'result success-result';
+                    resultDiv.innerHTML = `✅ Accesso autorizzato alla notifica ${notifId}`;
+                } else if (response.status === 403) {
+                    resultDiv.className = 'result success-result';
+                    resultDiv.innerHTML = `✅ Authorization middleware funziona! Accesso negato (403)`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `Status ${response.status}: ${data.message || data.error}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Errore: ${error.message}`;
+            }
+        }
+
+        async function testUnauthorized() {
+            // Test con ID notifica molto alto (probabilmente non esiste o non appartiene all'utente)
+            document.getElementById('notificationId').value = '99999';
+            await testAuthorization();
+        }
+
+        async function testXSSProtection() {
+            const title = document.getElementById('xssTitle').value;
+            const message = document.getElementById('xssMessage').value;
+            const resultDiv = document.getElementById('validationResult');
+
+            // Simuliamo la creazione di una notifica e vediamo come viene sanitizzata
+            try {
+                const response = await fetch('/api/notification-test/generic', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: 1,
+                        title: title,
+                        message: message
+                    })
+                });
+
+                const data = await response.json();
+
+                resultDiv.className = 'result success-result';
+                resultDiv.innerHTML = `
+                    ✅ Test XSS completato<br>
+                    <strong>Input originale:</strong><br>
+                    <pre>${title}</pre>
+                    <strong>Response:</strong><br>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <em>Se vedi script tags, potrebbero essere sanitizzati nell'output HTML</em>
+                `;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Errore: ${error.message}`;
+            }
+        }
+
+        async function testAPIEndpoint(endpoint, needsAuth = false) {
+            const resultDiv = document.getElementById('apiResult');
+            const token = document.getElementById('authToken').value || currentToken;
+
+            if (needsAuth && !token) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '❌ Token richiesto per questo endpoint. Fai prima il login.';
+                return;
+            }
+
+            try {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+
+                if (needsAuth) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(endpoint, { headers });
+                const data = await response.json();
+
+                let statusClass = response.ok ? 'success-result' : 'error';
+
+                resultDiv.className = `result ${statusClass}`;
+                resultDiv.innerHTML = `
+                    <strong>${endpoint}</strong> - Status: ${response.status}<br>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Errore su ${endpoint}: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+
+</html>
