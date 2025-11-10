@@ -36,6 +36,9 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // 🚀 Lancia l'evento per inviare email + notifica automaticamente!
+        \App\Events\UserRegistered::dispatch($user);
+
         return response()->json([
             'message' => 'Registrazione avvenuta con successo',
             'token' => $token,
