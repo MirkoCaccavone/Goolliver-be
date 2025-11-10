@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContestController;
 use App\Http\Controllers\Api\EntryController;
+use App\Http\Controllers\Api\ModerationController;
 use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\TransactionController;
@@ -76,6 +77,36 @@ Route::prefix('test')->group(function () {
         Route::post('/upload', [App\Http\Controllers\PhotoTestController::class, 'testUpload']);
         Route::get('/storage-info', [App\Http\Controllers\PhotoTestController::class, 'storageInfo']);
         Route::get('/list', [App\Http\Controllers\PhotoTestController::class, 'listPhotos']);
+    });
+
+    // Moderation Test Route (public)
+    Route::post('/moderation/analyze', function (\Illuminate\Http\Request $request) {
+        try {
+            $request->validate([
+                'photo' => 'required|image|max:10240'
+            ]);
+
+            $moderationService = new \App\Services\ModerationService();
+            $result = $moderationService->moderatePhoto($request->file('photo'));
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Analisi moderazione completata',
+                'data' => [
+                    'moderation_result' => $result,
+                    'file_info' => [
+                        'name' => $request->file('photo')->getClientOriginalName(),
+                        'size' => $request->file('photo')->getSize(),
+                        'type' => $request->file('photo')->getMimeType()
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Errore durante analisi: ' . $e->getMessage()
+            ], 500);
+        }
     });
 });
 
@@ -397,3 +428,15 @@ Route::get('/debug/set-token/{userId}', function (Illuminate\Http\Request $reque
 });
 
 // Le route /notifications/view e /notifications/view-test sono ora prima del middleware auth:sanctum
+
+// Moderation Routes (Admin only)
+Route::middleware(['auth:sanctum'])->prefix('moderation')->group(function () {
+    Route::get('/photos/pending', [\App\Http\Controllers\Api\ModerationController::class, 'pendingPhotos']);
+    Route::get('/photos/{entryId}/details', [\App\Http\Controllers\Api\ModerationController::class, 'photoDetails']);
+    Route::post('/photos/{entryId}/approve', [\App\Http\Controllers\Api\ModerationController::class, 'approvePhoto']);
+    Route::post('/photos/{entryId}/reject', [\App\Http\Controllers\Api\ModerationController::class, 'rejectPhoto']);
+    Route::post('/photos/{entryId}/reanalyze', [\App\Http\Controllers\Api\ModerationController::class, 'reanalyzePhoto']);
+    Route::get('/statistics', [\App\Http\Controllers\Api\ModerationController::class, 'statistics']);
+    Route::get('/config', [\App\Http\Controllers\Api\ModerationController::class, 'getConfig']);
+    Route::post('/config', [\App\Http\Controllers\Api\ModerationController::class, 'updateConfig']);
+});

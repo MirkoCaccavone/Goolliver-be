@@ -75,9 +75,14 @@ class PhotoTestController extends Controller
                     'thumbnail_url' => $entry->thumbnail_url,
                     'processing_status' => $entry->processing_status,
                     'moderation_status' => $entry->moderation_status,
+                    'moderation_score' => $entry->moderation_score,
                     'dimensions' => $entry->dimensions,
-                    'file_size' => number_format($entry->file_size / 1024, 1) . ' KB'
-                ]
+                    'file_size' => $entry->file_size,
+                    'mime_type' => $entry->mime_type,
+                    'metadata' => $entry->metadata,
+                    'created_at' => $entry->created_at
+                ],
+                'data' => $entry  // Aggiunge anche l'entry completa per compatibilità
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([

@@ -39,8 +39,8 @@ class PhotoService
         // 4. Controlli di sicurezza avanzati
         $this->performSecurityChecks($tempPath);
 
-        // 5. Content moderation (AI/Manual)
-        $moderationResult = $this->checkContentModeration($tempPath);
+        // 5. Content moderation (AI/Manual) - passa il file originale per nome corretto
+        $moderationResult = $this->checkContentModeration($file, $tempPath);
 
         // 6. Processing immagine (resize, thumbnails)
         $processedPaths = $this->processImage($tempPath, $filename);
@@ -58,7 +58,7 @@ class PhotoService
             'camera_model' => $data['camera_model'] ?? null,
             'settings' => $data['settings'] ?? null,
             'tags' => $data['tags'] ?? null,
-            'moderation_status' => $moderationResult['auto_approved'] ? 'approved' : 'pending',
+            'moderation_status' => $this->determineModerationStatus($moderationResult),
             'processing_status' => 'completed',
             'moderation_score' => $moderationResult['score'],
             'file_size' => $file->getSize(),
@@ -67,7 +67,15 @@ class PhotoService
             'metadata' => [
                 'upload_timestamp' => now()->toISOString(),
                 'original_filename' => $file->getClientOriginalName(),
-                'processing_version' => '1.0'
+                'processing_version' => '1.0',
+                'moderation' => [
+                    'provider' => $moderationResult['provider'],
+                    'confidence' => $moderationResult['confidence'],
+                    'categories' => $moderationResult['categories'],
+                    'flagged_reasons' => $moderationResult['flags'],
+                    'processing_time_ms' => $moderationResult['processing_time'],
+                    'full_result' => $moderationResult['full_result'] ?? null
+                ]
             ]
         ]);
 
@@ -75,6 +83,22 @@ class PhotoService
         Storage::disk('temp_uploads')->delete($filename);
 
         return $entry;
+    }
+
+    /**
+     * Determina lo status di moderazione basato sul risultato
+     */
+    private function determineModerationStatus(array $moderationResult): string
+    {
+        if ($moderationResult['auto_approved']) {
+            return 'approved';
+        } elseif ($moderationResult['needs_human_review']) {
+            return 'pending_review';
+        } elseif ($moderationResult['score'] >= 0.9) {
+            return 'rejected';
+        } else {
+            return 'pending';
+        }
     }
 
     /**
@@ -222,19 +246,69 @@ class PhotoService
     }
 
     /**
-     * Content moderation (placeholder per AI)
+     * Content moderation con AI
      */
-    private function checkContentModeration(string $filePath): array
+    private function checkContentModeration(UploadedFile $originalFile, string $tempPath): array
     {
-        // TODO: Integrazione con servizi AI (Google Vision, AWS Rekognition)
-        // Per ora utilizziamo un sistema base
+        try {
+            // Crea un UploadedFile temporaneo MA con il nome originale
+            $tempFile = new UploadedFile(
+                $tempPath,
+                $originalFile->getClientOriginalName(), // USA IL NOME ORIGINALE!
+                $originalFile->getMimeType(),
+                null,
+                true
+            );
 
-        return [
-            'auto_approved' => true, // Cambieremo con AI
-            'score' => 0.9, // Confidence score
-            'flags' => [], // Problemi rilevati
-            'needs_human_review' => false
-        ];
+            $moderationService = new ModerationService();
+            $result = $moderationService->moderatePhoto($tempFile);
+
+            Log::info('Photo moderation completed', [
+                'original_filename' => $originalFile->getClientOriginalName(),
+                'status' => $result['status'],
+                'score' => $result['overall_score'],
+                'requires_review' => $result['requires_review'],
+                'flagged_reasons' => count($result['flagged_reasons']),
+                'provider' => $result['provider']
+            ]);
+
+            return [
+                'auto_approved' => $result['status'] === 'approved',
+                'score' => $result['overall_score'],
+                'confidence' => $result['confidence'],
+                'flags' => $result['flagged_reasons'],
+                'needs_human_review' => $result['requires_review'],
+                'categories' => $result['categories'],
+                'provider' => $result['provider'],
+                'processing_time' => $result['processing_time_ms'],
+                'full_result' => $result
+            ];
+        } catch (\Exception $e) {
+            Log::error('Content moderation failed', [
+                'error' => $e->getMessage(),
+                'original_filename' => $originalFile->getClientOriginalName(),
+                'file_path' => $tempPath
+            ]);
+
+            // Fallback conservativo: richiedi revisione manuale
+            return [
+                'auto_approved' => false,
+                'score' => 0.5,
+                'confidence' => 0.0,
+                'flags' => [
+                    [
+                        'category' => 'error',
+                        'score' => 0.5,
+                        'description' => 'Errore durante moderazione: ' . $e->getMessage()
+                    ]
+                ],
+                'needs_human_review' => true,
+                'categories' => ['inappropriate' => 0.5],
+                'provider' => 'error_fallback',
+                'processing_time' => 0,
+                'error' => $e->getMessage()
+            ];
+        }
     }
 
     /**
