@@ -7,7 +7,7 @@ use App\Http\Controllers\Api\ModerationController;
 use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\Api\VoteController;
+use App\Http\Controllers\VoteController;
 use App\Http\Controllers\EmailTestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -439,4 +439,19 @@ Route::middleware(['auth:sanctum'])->prefix('moderation')->group(function () {
     Route::get('/statistics', [\App\Http\Controllers\Api\ModerationController::class, 'statistics']);
     Route::get('/config', [\App\Http\Controllers\Api\ModerationController::class, 'getConfig']);
     Route::post('/config', [\App\Http\Controllers\Api\ModerationController::class, 'updateConfig']);
+});
+
+// Vote Routes (Sistema di Voto Semplificato)
+Route::prefix('votes')->group(function () {
+    // Toggle like per una foto (un voto per utente per contest)
+    Route::post('/entries/{entryId}/like', [VoteController::class, 'toggleLike']);
+
+    // Stato del voto dell'utente nel contest
+    Route::get('/contests/{contestId}/user-vote-status', [VoteController::class, 'getUserVoteStatus']);
+
+    // Statistiche voti
+    Route::get('/entries/{entryId}/stats', [VoteController::class, 'getVoteStats']);
+
+    // Leaderboard per contest (basato solo sui like)
+    Route::get('/contests/{contestId}/leaderboard', [VoteController::class, 'getLeaderboard']);
 });

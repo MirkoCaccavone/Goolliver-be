@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗳️ Test Sistema di Voto Semplificato - Goolliver</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .info-box {
+            background: #e8f5e8;
+            border: 2px solid #4caf50;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .info-box h3 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
+        .info-box ul {
+            color: #2e7d32;
+            padding-left: 20px;
+        }
+
+        .info-box li {
+            margin-bottom: 8px;
+        }
+
+        .demo-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .photo-card {
+            background: #f8f9fa;
+            border: 2px solid #f0f0f0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .photo-placeholder {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .vote-status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .vote-status.no-vote {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .vote-status.has-vote {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .vote-btn {
+            background: #e91e63;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s ease;
+            width: 100%;
+        }
+
+        .vote-btn:hover {
+            background: #c2185b;
+        }
+
+        .vote-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .control-group {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .control-group h4 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        select,
+        button,
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #4ECDC4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #45B7AA;
+        }
+
+        .response {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .leaderboard {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: white;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .rank {
+            font-size: 24px;
+            font-weight: bold;
+            margin-right: 20px;
+            min-width: 60px;
+        }
+
+        .entry-info {
+            flex: 1;
+        }
+
+        .entry-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .entry-stats {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .score {
+            font-size: 20px;
+            font-weight: bold;
+            color: #e91e63;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗳️ Sistema di Voto Semplificato</h1>
+            <p>Un voto per utente, per partecipanti contest</p>
+        </div>
+
+        <div class="content">
+            <!-- Info Box -->
+            <div class="info-box">
+                <h3>📋 Regole del Nuovo Sistema di Voto</h3>
+                <ul>
+                    <li><strong>1 utente = 1 voto</strong> per contest</li>
+                    <li><strong>Solo partecipanti</strong> al contest possono votare (chi ha caricato almeno una foto)
+                    </li>
+                    <li><strong>Non puoi votare la tua foto</strong></li>
+                    <li><strong>Puoi cambiare</strong> il tuo voto spostandolo su un'altra foto</li>
+                    <li><strong>Classifica basata solo sui like</strong> (niente rating complesso)</li>
+                </ul>
+            </div>
+
+            <!-- Status Utente -->
+            <div class="control-group">
+                <h4>👤 Seleziona Utente per Test</h4>
+                <select id="current-user">
+                    <option value="25">User #25 - Partecipante Contest #7</option>
+                    <option value="26">User #26 - Partecipante Contest #7</option>
+                    <option value="27">User #27 - Partecipante Contest #7</option>
+                    <option value="28">User #28 - Partecipante Contest #7</option>
+                    <option value="29">User #29 - Partecipante Contest #7</option>
+                </select>
+                <button onclick="checkUserVoteStatus()">🔍 Controlla Stato Voto</button>
+                <div id="user-status-response" class="response" style="display: none;"></div>
+            </div>
+
+            <!-- Demo Photos -->
+            <div class="demo-section">
+                <!-- Photo 1 -->
+                <div class="photo-card" id="card-24">
+                    <div class="photo-placeholder">📸</div>
+                    <h3>Entry #24</h3>
+                    <p>ID: 24 | User: #25</p>
+
+                    <div class="vote-status no-vote" id="status-24">
+                        ❓ Stato voto sconosciuto
+                    </div>
+
+                    <button class="vote-btn" onclick="voteForEntry(24)" id="btn-24">
+                        💖 Vota questa foto
+                    </button>
+
+                    <div class="entry-stats" id="stats-24">
+                        Loading stats...
+                    </div>
+                </div>
+
+                <!-- Photo 2 -->
+                <div class="photo-card" id="card-25">
+                    <div class="photo-placeholder">�</div>
+                    <h3>Entry #25</h3>
+                    <p>ID: 25 | User: #26</p>
+
+                    <div class="vote-status no-vote" id="status-25">
+                        ❓ Stato voto sconosciuto
+                    </div>
+
+                    <button class="vote-btn" onclick="voteForEntry(25)" id="btn-25">
+                        💖 Vota questa foto
+                    </button>
+
+                    <div class="entry-stats" id="stats-25">
+                        Loading stats...
+                    </div>
+                </div>
+
+                <!-- Photo 3 -->
+                <div class="photo-card" id="card-26">
+                    <div class="photo-placeholder">🌿</div>
+                    <h3>Entry #26</h3>
+                    <p>ID: 26 | User: #27</p>
+
+                    <div class="vote-status no-vote" id="status-26">
+                        ❓ Stato voto sconosciuto
+                    </div>
+
+                    <button class="vote-btn" onclick="voteForEntry(26)" id="btn-26">
+                        💖 Vota questa foto
+                    </button>
+
+                    <div class="entry-stats" id="stats-26">
+                        Loading stats...
+                    </div>
+                </div>
+
+                <!-- Photo 4 -->
+                <div class="photo-card" id="card-27">
+                    <div class="photo-placeholder">�️</div>
+                    <h3>Entry #27</h3>
+                    <p>ID: 27 | User: #28</p>
+
+                    <div class="vote-status no-vote" id="status-27">
+                        ❓ Stato voto sconosciuto
+                    </div>
+
+                    <button class="vote-btn" onclick="voteForEntry(27)" id="btn-27">
+                        💖 Vota questa foto
+                    </button>
+
+                    <div class="entry-stats" id="stats-27">
+                        Loading stats...
+                    </div>
+                </div>
+
+                <!-- Photo 5 -->
+                <div class="photo-card" id="card-28">
+                    <div class="photo-placeholder">🌺</div>
+                    <h3>Entry #28</h3>
+                    <p>ID: 28 | User: #29</p>
+
+                    <div class="vote-status no-vote" id="status-28">
+                        ❓ Stato voto sconosciuto
+                    </div>
+
+                    <button class="vote-btn" onclick="voteForEntry(28)" id="btn-28">
+                        💖 Vota questa foto
+                    </button>
+
+                    <div class="entry-stats" id="stats-28">
+                        Loading stats...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="leaderboard">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>🏆 Classifica Contest</h3>
+                    <button onclick="loadLeaderboard()" style="padding: 5px 15px; width: auto;">🔄 Aggiorna</button>
+                </div>
+                <div id="leaderboard-container">
+                    <p style="text-align: center; color: #888;">Caricamento classifica...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/votes';
+        let currentUser = 25;
+        let currentContest = 7; // Contest di default
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Setup user change listener
+            document.getElementById('current-user').addEventListener('change', function () {
+                currentUser = parseInt(this.value);
+                updateUI();
+            });
+
+            // Initial load
+            updateUI();
+        });
+
+        async function updateUI() {
+            // Prima aggiorna lo stato del voto (questo aggiorna anche l'UI dei pulsanti)
+            await checkUserVoteStatus();
+
+            // Poi aggiorna le statistiche
+            loadStats(24);
+            loadStats(25);
+            loadStats(26);
+            loadStats(27);
+            loadStats(28);
+            loadLeaderboard();
+        }
+
+        async function checkUserVoteStatus() {
+            const responseDiv = document.getElementById('user-status-response');
+
+            try {
+                responseDiv.style.display = 'block';
+                responseDiv.className = 'response';
+                responseDiv.textContent = '🔄 Verificando stato voto...';
+
+                const response = await fetch(`${API_BASE}/contests/${currentContest}/user-vote-status?user_id=${currentUser}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const voteData = result.data;
+
+                    if (voteData.has_voted) {
+                        responseDiv.className = 'response success';
+                        responseDiv.innerHTML = `
+                            ✅ <strong>Hai già votato!</strong><br>
+                            Foto votata: ${voteData.voted_entry_title} (ID: ${voteData.voted_entry_id})
+                        `;
+
+                        // Update UI per mostrare il voto esistente
+                        updateVoteStatusUI(voteData.voted_entry_id);
+                    } else {
+                        responseDiv.className = 'response';
+                        responseDiv.innerHTML = '⭐ Non hai ancora votato in questo contest';
+
+                        // Reset UI
+                        updateVoteStatusUI(null);
+                    }
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = 'Errore: ' + (result.error || 'Unknown error');
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = 'Errore di rete: ' + error.message;
+            }
+        }
+
+        function updateVoteStatusUI(votedEntryId) {
+            console.log('🔄 Aggiornando UI per utente', currentUser, 'con voto su entry:', votedEntryId);
+
+            // Reset tutti gli stati
+            [24, 25, 26, 27, 28].forEach(id => {
+                const statusDiv = document.getElementById(`status-${id}`);
+                const btn = document.getElementById(`btn-${id}`);
+
+                if (statusDiv && btn) {
+                    if (votedEntryId && parseInt(votedEntryId) === id) {
+                        statusDiv.className = 'vote-status has-vote';
+                        statusDiv.innerHTML = '✅ Il tuo voto è qui';
+                        btn.textContent = '🔄 Rimuovi voto';
+                        console.log('✅ Entry', id, 'marcata come votata');
+                    } else {
+                        statusDiv.className = 'vote-status no-vote';
+                        statusDiv.innerHTML = votedEntryId ? '⚪ Non votata' : '❓ Stato sconosciuto';
+                        btn.textContent = votedEntryId ? '🔄 Sposta voto qui' : '💖 Vota questa foto';
+                        console.log('⚪ Entry', id, 'marcata come non votata');
+                    }
+                }
+            });
+        }
+
+        async function voteForEntry(entryId) {
+            const btn = document.getElementById(`btn-${entryId}`);
+            const originalText = btn.textContent;
+
+            try {
+                btn.disabled = true;
+                btn.textContent = '🔄 Elaborazione...';
+
+                const response = await fetch(`${API_BASE}/entries/${entryId}/like`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser })
+                });
+
+                const result = await response.json();
+                console.log('📊 Risposta API voto:', result);
+
+                if (result.success) {
+                    // Mostra messaggio successo
+                    const message = result.data.message || `Voto ${result.data.action}`;
+                    console.log('✅ Voto operazione:', result.data.action, 'per entry', entryId);
+
+                    // Update UI immediato basato sulla risposta
+                    console.log('🔄 Aggiornamento UI immediato...');
+
+                    // Determina quale entry è ora votata in base all'azione
+                    let newVotedEntry = null;
+                    if (result.data.action === 'added' || result.data.action === 'moved') {
+                        newVotedEntry = entryId;
+                    }
+                    // Se action è 'removed', newVotedEntry rimane null
+
+                    console.log('🎯 Nuovo voto su entry:', newVotedEntry);
+                    updateVoteStatusUI(newVotedEntry);
+
+                    // Aggiorna tutte le statistiche (in caso di spostamento voto)
+                    loadStats(24);
+                    loadStats(25);
+                    loadStats(26);
+                    loadStats(27);
+                    loadStats(28);
+                    loadLeaderboard();
+
+                    alert(`✅ ${message}`);
+
+                    btn.disabled = false;
+                    // NON ripristinare originalText qui - lascia che updateVoteStatusUI gestisca i pulsanti
+                } else {
+                    alert(`❌ Errore: ${result.error}`);
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            } catch (error) {
+                alert(`❌ Errore di rete: ${error.message}`);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        async function loadStats(entryId) {
+            const statsDiv = document.getElementById(`stats-${entryId}`);
+
+            try {
+                const response = await fetch(`${API_BASE}/entries/${entryId}/stats?user_id=${currentUser}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const stats = result.data;
+                    statsDiv.innerHTML = `
+                        <div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 6px;">
+                            <strong>📊 ${stats.likes_count} like</strong><br>
+                            <small>Score: ${stats.vote_score}</small>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statsDiv.innerHTML = '<small>Errore caricamento stats</small>';
+            }
+        }
+
+        async function loadLeaderboard() {
+            const containerDiv = document.getElementById('leaderboard-container');
+
+            try {
+                containerDiv.innerHTML = '<p style="text-align: center; color: #4ECDC4;">🔄 Caricamento classifica...</p>';
+
+                const response = await fetch(`${API_BASE}/contests/${currentContest}/leaderboard?limit=10`);
+                const result = await response.json();
+
+                if (result.success && result.data.entries.length > 0) {
+                    let html = '';
+                    result.data.entries.forEach((entry, index) => {
+                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
+                        html += `
+                            <div class="leaderboard-item" style="background: ${index < 3 ? '#fff3cd' : 'white'};">
+                                <div class="rank">${medal} #${index + 1}</div>
+                                <div class="entry-info">
+                                    <div class="entry-title">${entry.title || `Foto #${entry.id}`}</div>
+                                    <div class="entry-stats">User #${entry.user_id} | ${entry.likes_count} like</div>
+                                </div>
+                                <div class="score">${entry.likes_count}</div>
+                            </div>
+                        `;
+                    });
+                    containerDiv.innerHTML = html;
+                } else if (result.success) {
+                    containerDiv.innerHTML = '<p style="text-align: center; color: #888;">Nessuna foto nel contest</p>';
+                }
+            } catch (error) {
+                containerDiv.innerHTML = '<p style="text-align: center; color: #dc3545;">❌ Errore caricamento classifica</p>';
+            }
+        }
+    </script>
+</body>
+
+</html>
