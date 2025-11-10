@@ -11,11 +11,18 @@ class Vote extends Model
 {
     use HasFactory;
 
+    // Tipi di voto disponibili
+    const TYPE_LIKE = 'like';
+
     protected $fillable = [
         'user_id',
         'entry_id',
+        'vote_type',
+        'ip_address',
+        'user_agent',
     ];
 
+    // Relazioni
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -24,5 +31,11 @@ class Vote extends Model
     public function entry()
     {
         return $this->belongsTo(Entry::class);
+    }
+
+    // Scope per tipi di voto
+    public function scopeLikes($query)
+    {
+        return $query->where('vote_type', self::TYPE_LIKE);
     }
 }
