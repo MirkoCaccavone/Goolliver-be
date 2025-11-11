@@ -24,6 +24,8 @@ class User extends Authenticatable
         'role',         // ruolo: user, moderator, admin
         'is_active',    // stato attivo/disattivo
         'last_login_at', // ultimo login
+        'photo_credits', // crediti per foto (rimborsi)
+        'credit_notes',  // note sui crediti ricevuti
     ];
 
     /**
@@ -44,6 +46,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
+            'photo_credits' => 'integer',
         ];
     }
 

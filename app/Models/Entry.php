@@ -33,7 +33,8 @@ class Entry extends Model
         'votes_count',
         'views_count',
         'likes_count',
-        'vote_score'
+        'vote_score',
+        'credit_given'
     ];
 
     protected $casts = [
@@ -45,6 +46,7 @@ class Entry extends Model
         'views_count' => 'integer',
         'likes_count' => 'integer',
         'vote_score' => 'decimal:2',
+        'credit_given' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
