@@ -66,6 +66,7 @@ class AuthController extends Controller
         // Verifica se l'utente esiste
         if (!$user) {
             return response()->json([
+                'success' => false,
                 'message' => 'Credenziali non valide',
                 'errors' => [
                     'email' => ['Email non trovata.']
@@ -76,6 +77,7 @@ class AuthController extends Controller
         // Verifica se l'utente ha una password (non è un utente social)
         if (is_null($user->password)) {
             return response()->json([
+                'success' => false,
                 'message' => 'Account social',
                 'errors' => [
                     'email' => ['Questo account è registrato tramite social login (' . ucfirst($user->provider) . '). Usa il login social.']
@@ -86,6 +88,7 @@ class AuthController extends Controller
         // Verifica la password
         if (!Hash::check($request->password, $user->password)) {
             return response()->json([
+                'success' => false,
                 'message' => 'Credenziali non valide',
                 'errors' => [
                     'password' => ['Password non corretta.']
@@ -95,10 +98,14 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Aggiorna last_login_at
+        $user->update(['last_login_at' => now()]);
+
         return response()->json([
+            'success' => true,
             'message' => 'Login effettuato con successo',
             'token' => $token,
-            'user' => $user,
+            'user' => $user->fresh(), // Ricarica l'utente con i dati aggiornati
         ]);
     }
 
