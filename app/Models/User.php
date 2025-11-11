@@ -18,9 +18,12 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'phone',        // nuovo campo facoltativo
+        'phone',        // campo facoltativo
         'provider',     // login tramite social (es. google, facebook)
         'provider_id',  // ID univoco del provider
+        'role',         // ruolo: user, moderator, admin
+        'is_active',    // stato attivo/disattivo
+        'last_login_at', // ultimo login
     ];
 
     /**
@@ -39,6 +42,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 

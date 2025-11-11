@@ -25,4 +25,10 @@ class Contest extends Model
     {
         return $this->hasMany(Transaction::class);
     }
+
+    // Relazione per contare i voti totali del contest (attraverso le entries)
+    public function votes()
+    {
+        return $this->hasManyThrough(Vote::class, Entry::class);
+    }
 }
