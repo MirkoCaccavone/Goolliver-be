@@ -9,10 +9,10 @@ use Illuminate\Support\Facades\Storage;
 
 class EntryController extends Controller
 {
-    // Tutte le entries
+    // Tutte le entries (solo quelle pubbliche/approvate)
     public function index()
     {
-        $entries = Entry::all();
+        $entries = Entry::public()->get();
         return response()->json($entries);
     }
 
@@ -45,10 +45,10 @@ class EntryController extends Controller
         ], 201);
     }
 
-    // Mostra una singola entry
+    // Mostra una singola entry (solo se pubblica/approvata)
     public function show($id)
     {
-        $entry = Entry::findOrFail($id);
+        $entry = Entry::public()->findOrFail($id);
         return response()->json($entry);
     }
 

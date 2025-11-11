@@ -93,13 +93,27 @@ class Entry extends Model
             ->first();
     }
 
+    // Scope per filtrare la visibilità
+    public function scopeVisible($query)
+    {
+        return $query->whereIn('moderation_status', ['approved', 'pending']);
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('moderation_status', 'approved');
+    }
+
+    public function scopePublic($query)
+    {
+        return $query->where('moderation_status', 'approved');
+    }
+
     // Scope per ranking
     public function scopeOrderByVoteScore($query, $direction = 'desc')
     {
         return $query->orderBy('vote_score', $direction);
     }
-
-
 
     public function scopeOrderByLikes($query, $direction = 'desc')
     {

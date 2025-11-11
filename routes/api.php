@@ -126,6 +126,7 @@ Route::prefix('contests')->group(function () {
     Route::get('/', [ContestController::class, 'index']);          // lista concorsi
     Route::post('/', [ContestController::class, 'store']);         // crea concorso
     Route::get('/{id}', [ContestController::class, 'show']);       // singolo concorso
+    Route::get('/{id}/entries', [ContestController::class, 'entries']); // entries del concorso (solo pubbliche)
     Route::put('/{id}', [ContestController::class, 'update']);     // aggiorna concorso
     Route::delete('/{id}', [ContestController::class, 'destroy']); // elimina concorso
 });
@@ -180,6 +181,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Gallery e listing
         Route::get('/contest/{contest}/gallery', [PhotoController::class, 'gallery']);
         Route::get('/user/my-photos', [PhotoController::class, 'userPhotos']);
+
+        // Crediti utente
+        Route::get('/user/credits', [PhotoController::class, 'userCredits']);
 
         // Stato moderazione
         Route::get('/{entry}/moderation-status', [PhotoController::class, 'moderationStatus'])
@@ -474,11 +478,15 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Gestione contest
     Route::get('/contests', [AdminController::class, 'contests']);
     Route::get('/contests/{contestId}/details', [AdminController::class, 'contestDetails']);
+
+    // Analytics crediti
+    Route::get('/credits/analytics', [AdminController::class, 'creditAnalytics']);
 });
 
 // Rotte per moderatori e admin  
 Route::middleware(['auth:sanctum', 'moderator'])->prefix('moderation')->group(function () {
     // Gestione moderazione
     Route::get('/entries', [AdminController::class, 'moderation']);
-    Route::patch('/entries/{entryId}/moderate', [AdminController::class, 'moderateEntry']);
+    Route::patch('/entries/{entryId}/moderate', [AdminController::class, 'moderateEntry'])
+        ->middleware('throttle:30,1'); // Max 30 moderazioni al minuto per prevenire spam
 });

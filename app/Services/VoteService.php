@@ -21,6 +21,11 @@ class VoteService
 
             $entry = Entry::findOrFail($entryId);
 
+            // REGOLA 0: Solo le foto approvate possono ricevere voti
+            if ($entry->moderation_status !== 'approved') {
+                throw new \InvalidArgumentException('Solo le foto approvate possono ricevere voti');
+            }
+
             // REGOLA 1: Non puoi votare la tua foto
             if ($entry->user_id == $userId) {
                 throw new \InvalidArgumentException('Non puoi votare la tua stessa foto');

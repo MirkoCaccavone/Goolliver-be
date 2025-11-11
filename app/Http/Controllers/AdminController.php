@@ -10,6 +10,9 @@ use App\Models\Vote;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\PhotoRejectedMail;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class AdminController extends Controller
 {
@@ -58,6 +61,25 @@ class AdminController extends Controller
                 $stats['entries']['approved'] = 0;
                 $stats['entries']['pending'] = $stats['entries']['total'];
                 $stats['entries']['rejected'] = 0;
+            }
+
+            // Aggiungiamo statistiche sui crediti
+            try {
+                $stats['credits'] = [
+                    'total_credits_distributed' => User::sum('photo_credits'),
+                    'users_with_credits' => User::where('photo_credits', '>', 0)->count(),
+                    'entries_that_gave_credits' => Entry::where('credit_given', true)->count(),
+                    'average_credits_per_user' => User::where('photo_credits', '>', 0)->avg('photo_credits'),
+                    'max_credits_single_user' => User::max('photo_credits')
+                ];
+            } catch (\Exception $e) {
+                $stats['credits'] = [
+                    'total_credits_distributed' => 0,
+                    'users_with_credits' => 0,
+                    'entries_that_gave_credits' => 0,
+                    'average_credits_per_user' => 0,
+                    'max_credits_single_user' => 0
+                ];
             }
 
             return response()->json([
@@ -397,13 +419,42 @@ class AdminController extends Controller
      */
     public function moderateEntry(Request $request, $entryId)
     {
-        $request->validate([
-            'action' => 'required|in:approve,reject,pending',
-            'reason' => 'nullable|string'
-        ]);
+        // Validazione ID entry
+        if (!is_numeric($entryId) || $entryId <= 0) {
+            return response()->json([
+                'success' => false,
+                'error' => 'ID entry non valido',
+                'code' => 'INVALID_ENTRY_ID'
+            ], 400);
+        }
+
+        // Validazione input
+        try {
+            $request->validate([
+                'action' => 'required|in:approve,reject,pending',
+                'reason' => 'nullable|string|max:500'
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Dati di input non validi',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         try {
+            // Verifica esistenza entry
             $entry = Entry::findOrFail($entryId);
+
+            // Verifica autorizzazioni (già controllato dal middleware, ma doppio controllo)
+            $user = Auth::user();
+            if (!in_array($user->role, ['admin', 'moderator'])) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Non hai i permessi per moderare contenuti',
+                    'code' => 'INSUFFICIENT_PERMISSIONS'
+                ], 403);
+            }
 
             $statusMap = [
                 'approve' => 'approved',
@@ -465,6 +516,27 @@ class AdminController extends Controller
                     'new_credits' => $user->fresh()->photo_credits,
                     'credit_given_flag' => true
                 ]);
+
+                // 📧 Invia email di notifica all'utente
+                try {
+                    Mail::to($user->email)->send(new PhotoRejectedMail(
+                        $entry->fresh(),
+                        $request->reason ?: 'Non specificato',
+                        1 // crediti assegnati
+                    ));
+
+                    Log::info('Email di rifiuto foto inviata', [
+                        'user_id' => $user->id,
+                        'entry_id' => $entry->id,
+                        'email' => $user->email
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Errore invio email rifiuto foto', [
+                        'user_id' => $user->id,
+                        'entry_id' => $entry->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             } elseif ($shouldRemoveCredit) {
                 $user = $entry->user;
 
@@ -509,11 +581,24 @@ class AdminController extends Controller
                 'message' => $messages[$request->action],
                 'entry' => $entry->fresh()
             ]);
-        } catch (\Exception $e) {
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Errore nella moderazione del contenuto',
-                'details' => $e->getMessage()
+                'error' => 'Entry non trovata',
+                'code' => 'ENTRY_NOT_FOUND'
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Errore moderazione entry', [
+                'entry_id' => $entryId,
+                'action' => $request->action ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Errore interno durante la moderazione',
+                'code' => 'MODERATION_ERROR'
             ], 500);
         }
     }
@@ -538,5 +623,98 @@ class AdminController extends Controller
         // - Il campo processing_status per capire se ha passato AI
 
         return true; // Per ora diamo sempre credito per test
+    }
+
+    /**
+     * Analytics dettagliati sui crediti
+     */
+    public function creditAnalytics()
+    {
+        try {
+            // Statistiche generali
+            $generalStats = [
+                'total_credits_distributed' => User::sum('photo_credits'),
+                'users_with_credits' => User::where('photo_credits', '>', 0)->count(),
+                'total_users' => User::count(),
+                'entries_that_gave_credits' => Entry::where('credit_given', true)->count(),
+                'rejected_entries_total' => Entry::where('moderation_status', 'rejected')->count(),
+                'average_credits_per_user' => round(User::where('photo_credits', '>', 0)->avg('photo_credits'), 2),
+                'max_credits_single_user' => User::max('photo_credits')
+            ];
+
+            // Top 10 utenti con più crediti
+            $topUsers = User::where('photo_credits', '>', 0)
+                ->orderBy('photo_credits', 'desc')
+                ->take(10)
+                ->get(['id', 'name', 'email', 'photo_credits'])
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'credits' => $user->photo_credits
+                    ];
+                });
+
+            // Distribuzione crediti per range
+            $creditDistribution = [
+                '1-2_credits' => User::whereBetween('photo_credits', [1, 2])->count(),
+                '3-5_credits' => User::whereBetween('photo_credits', [3, 5])->count(),
+                '6-10_credits' => User::whereBetween('photo_credits', [6, 10])->count(),
+                '11+_credits' => User::where('photo_credits', '>', 10)->count(),
+            ];
+
+            // Entries recenti che hanno dato crediti
+            $recentCreditEntries = Entry::where('credit_given', true)
+                ->with(['user:id,name,email', 'contest:id,title'])
+                ->orderBy('updated_at', 'desc')
+                ->take(20)
+                ->get()
+                ->map(function ($entry) {
+                    return [
+                        'entry_id' => $entry->id,
+                        'title' => $entry->title ?: 'Senza titolo',
+                        'user_name' => $entry->user->name,
+                        'user_email' => $entry->user->email,
+                        'contest_title' => $entry->contest->title ?? 'Contest eliminato',
+                        'moderated_at' => $entry->moderated_at,
+                        'moderation_reason' => $entry->moderation_reason
+                    ];
+                });
+
+            // Movimenti di crediti per periodo (ultimi 30 giorni)
+            $creditMovements = User::where('credit_notes', '!=', '')
+                ->where('updated_at', '>=', now()->subDays(30))
+                ->get(['id', 'name', 'photo_credits', 'credit_notes', 'updated_at'])
+                ->map(function ($user) {
+                    $lines = array_filter(explode("\n", $user->credit_notes));
+                    $recentNotes = array_slice(array_reverse($lines), 0, 5); // Ultime 5 note
+
+                    return [
+                        'user_id' => $user->id,
+                        'user_name' => $user->name,
+                        'current_credits' => $user->photo_credits,
+                        'recent_movements' => $recentNotes,
+                        'last_update' => $user->updated_at
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'analytics' => [
+                    'general_stats' => $generalStats,
+                    'top_users' => $topUsers,
+                    'credit_distribution' => $creditDistribution,
+                    'recent_credit_entries' => $recentCreditEntries,
+                    'recent_movements' => $creditMovements->take(15) // Limita ai primi 15
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Errore nel caricamento degli analytics crediti',
+                'details' => $e->getMessage()
+            ], 500);
+        }
     }
 }

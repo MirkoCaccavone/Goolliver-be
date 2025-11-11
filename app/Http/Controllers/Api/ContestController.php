@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Contest;
+use App\Models\Entry;
 
 class ContestController extends Controller
 {
@@ -51,5 +52,15 @@ class ContestController extends Controller
         $contest = Contest::findOrFail($id);
         $contest->delete();
         return response()->json(['message' => 'Concorso eliminato']);
+    }
+
+    /**
+     * Ottieni tutte le entries pubbliche di un contest
+     */
+    public function entries($id)
+    {
+        $contest = Contest::findOrFail($id);
+        $entries = $contest->entries()->public()->get();
+        return response()->json($entries);
     }
 }

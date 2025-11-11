@@ -7,6 +7,7 @@ use App\Http\Requests\PhotoUploadRequest;
 use App\Http\Requests\UpdatePhotoRequest;
 use App\Models\Contest;
 use App\Models\Entry;
+use App\Models\User;
 use App\Services\PhotoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,46 @@ class PhotoController extends Controller
                 ], 409);
             }
 
-            // Upload and process photo
+            // 💳 GESTIONE PAGAMENTO CON CREDITI
+            $user = User::findOrFail(Auth::id()); // Prende il modello completo
+            $paymentMethod = $request->input('payment_method', 'card'); // 'credit' o 'card'
+            $useCredits = $paymentMethod === 'credit';
+
+            if ($useCredits) {
+                // Verifica che l'utente abbia almeno 1 credito
+                if ($user->photo_credits < 1) {
+                    return response()->json([
+                        'error' => 'Non hai abbastanza crediti per caricare una foto',
+                        'current_credits' => $user->photo_credits,
+                        'required_credits' => 1,
+                        'code' => 'INSUFFICIENT_CREDITS'
+                    ], 402); // 402 Payment Required
+                }
+
+                // Scala il credito PRIMA dell'upload
+                $user->decrement('photo_credits');
+
+                // Aggiorna le note sui crediti
+                $creditNote = "Credito utilizzato per caricamento foto - Contest: " . $contest->title;
+                $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
+                $user->update([
+                    'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
+                ]);
+
+                Log::info('Credito utilizzato per upload', [
+                    'user_id' => $user->id,
+                    'contest_id' => $contest->id,
+                    'credits_remaining' => $user->fresh()->photo_credits
+                ]);
+            } else {
+                // TODO: Gestire pagamento con carta/PayPal
+                // Per ora assumiamo che il pagamento sia sempre ok
+                Log::info('Pagamento con carta simulato', [
+                    'user_id' => $user->id,
+                    'contest_id' => $contest->id,
+                    'payment_method' => $paymentMethod
+                ]);
+            }            // Upload and process photo
             $photoData = $this->photoService->uploadPhoto(
                 $request->file('photo'),
                 $request->validated(),
@@ -82,6 +122,11 @@ class PhotoController extends Controller
                     'processing_status' => $entry->processing_status,
                     'moderation_status' => $entry->moderation_status,
                     'created_at' => $entry->created_at
+                ],
+                'payment' => [
+                    'method' => $paymentMethod,
+                    'credits_used' => $useCredits ? 1 : 0,
+                    'credits_remaining' => $user->fresh()->photo_credits
                 ]
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -348,6 +393,21 @@ class PhotoController extends Controller
             'moderation_score' => $entry->moderation_score,
             'processing_status' => $entry->processing_status,
             'metadata' => $entry->metadata
+        ]);
+    }
+
+    /**
+     * Ottieni i crediti dell'utente corrente
+     */
+    public function userCredits(): JsonResponse
+    {
+        $user = User::findOrFail(Auth::id());
+
+        return response()->json([
+            'user_id' => $user->id,
+            'photo_credits' => $user->photo_credits,
+            'credit_notes' => $user->credit_notes,
+            'last_updated' => $user->updated_at
         ]);
     }
 }
