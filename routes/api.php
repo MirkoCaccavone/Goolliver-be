@@ -455,3 +455,30 @@ Route::prefix('votes')->group(function () {
     // Leaderboard per contest (basato solo sui like)
     Route::get('/contests/{contestId}/leaderboard', [VoteController::class, 'getLeaderboard']);
 });
+
+// ================================
+// ROTTE ADMIN PANEL
+// ================================
+use App\Http\Controllers\AdminController;
+
+// Rotte per solo admin
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [AdminController::class, 'dashboard']);
+
+    // Gestione utenti
+    Route::get('/users', [AdminController::class, 'users']);
+    Route::patch('/users/{userId}/role', [AdminController::class, 'updateUserRole']);
+    Route::patch('/users/{userId}/status', [AdminController::class, 'toggleUserStatus']);
+
+    // Gestione contest
+    Route::get('/contests', [AdminController::class, 'contests']);
+    Route::get('/contests/{contestId}/details', [AdminController::class, 'contestDetails']);
+});
+
+// Rotte per moderatori e admin  
+Route::middleware(['auth:sanctum', 'moderator'])->prefix('moderation')->group(function () {
+    // Gestione moderazione
+    Route::get('/entries', [AdminController::class, 'moderation']);
+    Route::patch('/entries/{entryId}/moderate', [AdminController::class, 'moderateEntry']);
+});
