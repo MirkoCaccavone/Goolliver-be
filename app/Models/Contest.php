@@ -11,9 +11,22 @@ class Contest extends Model
     protected $fillable = [
         'title',
         'description',
+        'category',
         'status',
+        'start_date',
+        'end_date',
         'max_participants',
-        'prize'
+        'current_participants',
+        'prize',
+        'entry_fee'
+    ];
+
+    protected $casts = [
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'entry_fee' => 'decimal:2',
+        'current_participants' => 'integer',
+        'max_participants' => 'integer',
     ];
 
     public function entries()
