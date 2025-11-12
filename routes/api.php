@@ -160,6 +160,10 @@ Route::prefix('transactions')->group(function () {
 Route::middleware(['throttle:3,1'])->post('/register', [AuthController::class, 'register']);
 Route::middleware(['throttle:5,1'])->post('/login', [AuthController::class, 'login']);
 
+// Rotte recupero password
+Route::middleware(['throttle:3,1'])->post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::middleware(['throttle:3,1'])->post('/reset-password', [AuthController::class, 'resetPassword']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 

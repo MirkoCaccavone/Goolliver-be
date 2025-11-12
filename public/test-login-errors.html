@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login Error Messages</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+        }
+
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+        }
+
+        .error {
+            background: #ffebee;
+        }
+
+        .success {
+            background: #e8f5e8;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 8px;
+            margin: 5px;
+            width: 200px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Test Login Error Messages</h1>
+
+    <div class="test-section">
+        <h2>Test 1: Email mancante</h2>
+        <button onclick="testMissingEmail()">Test Email Mancante</button>
+        <div id="result1" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Password mancante</h2>
+        <button onclick="testMissingPassword()">Test Password Mancante</button>
+        <div id="result2" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Email non esistente</h2>
+        <button onclick="testInvalidEmail()">Test Email Non Esistente</button>
+        <div id="result3" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Password sbagliata</h2>
+        <button onclick="testWrongPassword()">Test Password Sbagliata</button>
+        <div id="result4" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: Login con credenziali corrette</h2>
+        <input type="email" id="email" placeholder="Email" value="test@example.com">
+        <input type="password" id="password" placeholder="Password" value="password123">
+        <button onclick="testValidLogin()">Test Login Valido</button>
+        <div id="result5" class="result"></div>
+    </div>
+
+    <script>
+        async function makeRequest(data) {
+            try {
+                const response = await fetch('http://localhost:8001/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                return { status: response.status, data: result };
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        async function testMissingEmail() {
+            const result = await makeRequest({ password: "test123" });
+            document.getElementById('result1').innerHTML =
+                `<strong>Status:</strong> ${result.status}<br>
+                 <strong>Response:</strong> ${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testMissingPassword() {
+            const result = await makeRequest({ email: "test@example.com" });
+            document.getElementById('result2').innerHTML =
+                `<strong>Status:</strong> ${result.status}<br>
+                 <strong>Response:</strong> ${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testInvalidEmail() {
+            const result = await makeRequest({
+                email: "nonexistent@example.com",
+                password: "test123"
+            });
+            document.getElementById('result3').innerHTML =
+                `<strong>Status:</strong> ${result.status}<br>
+                 <strong>Response:</strong> ${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testWrongPassword() {
+            const result = await makeRequest({
+                email: "test@example.com",
+                password: "wrongpassword"
+            });
+            document.getElementById('result4').innerHTML =
+                `<strong>Status:</strong> ${result.status}<br>
+                 <strong>Response:</strong> ${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testValidLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const result = await makeRequest({ email, password });
+            document.getElementById('result5').innerHTML =
+                `<strong>Status:</strong> ${result.status}<br>
+                 <strong>Response:</strong> ${JSON.stringify(result.data, null, 2)}`;
+        }
+    </script>
+</body>
+
+</html>

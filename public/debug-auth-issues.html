@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login & Password Recovery Issues</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .issue {
+            background: #ffebee;
+            border-color: #f44336;
+        }
+
+        .test {
+            background: #e8f5e8;
+            border-color: #4caf50;
+        }
+
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        input {
+            padding: 8px;
+            margin: 5px;
+            width: 200px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+
+        .links a {
+            display: block;
+            margin: 5px 0;
+            padding: 8px;
+            background: #f0f0f0;
+            text-decoration: none;
+            color: #333;
+            border-radius: 4px;
+        }
+
+        .links a:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🐛 Test dei Problemi Riportati</h1>
+
+    <div class="test-section issue">
+        <h2>❌ PROBLEMA 1: Login con email sbagliata</h2>
+        <p><strong>Sintomo:</strong> "se inserisco una mail sbagliata durante il login e premo accedi non mi fa accedere
+            ma refresha la pagina e si svuotano i campi ma non mi da nessun messaggio."</p>
+
+        <h3>Test Backend API:</h3>
+        <button onclick="testLoginWrongEmail()">Test API: Email Sbagliata</button>
+        <div id="apiResult1" class="result"></div>
+
+        <h3>Test Frontend:</h3>
+        <p>1. Apri <a href="http://localhost:5173/login" target="_blank">http://localhost:5173/login</a></p>
+        <p>2. Apri Developer Tools (F12) → Console</p>
+        <p>3. Inserisci email: <code>emailsbagliata@test.com</code></p>
+        <p>4. Inserisci password: <code>password123</code></p>
+        <p>5. Clicca "Accedi" e controlla la console per i log</p>
+    </div>
+
+    <div class="test-section issue">
+        <h2>❌ PROBLEMA 2: Recupero password non invia email</h2>
+        <p><strong>Sintomo:</strong> "se provo il recupero password mi dice di inserire la mail, poi mi dice che e stata
+            inviata una mail per il recupero delle credenziali ma effettivamente sulla mail non arriva niente"</p>
+
+        <h3>Test Backend API:</h3>
+        <input type="email" id="forgotEmail" placeholder="Email esistente" value="test@example.com">
+        <button onclick="testForgotPassword()">Test API: Forgot Password</button>
+        <div id="apiResult2" class="result"></div>
+
+        <h3>Test Frontend:</h3>
+        <p>1. Apri <a href="http://localhost:5173/forgot-password"
+                target="_blank">http://localhost:5173/forgot-password</a></p>
+        <p>2. Inserisci email: <code>test@example.com</code></p>
+        <p>3. Clicca "Invia email di reset"</p>
+        <p>4. Dovrebbe mostrare il link di test per il reset</p>
+    </div>
+
+    <div class="test-section test">
+        <h2>✅ SOLUZIONI IMPLEMENTATE</h2>
+
+        <h3>Per il Problema 1 (Login):</h3>
+        <ul>
+            <li>✅ Aggiunto debug console.log nell'authStore</li>
+            <li>✅ Verificata gestione errori 401/422</li>
+            <li>✅ Backend ritorna messaggi corretti</li>
+        </ul>
+
+        <h3>Per il Problema 2 (Password Recovery):</h3>
+        <ul>
+            <li>✅ Cambiato messaggio per essere onesto (no email reale)</li>
+            <li>✅ Aggiunto link di test per reset password</li>
+            <li>✅ Frontend mostra il link diretto al reset</li>
+        </ul>
+    </div>
+
+    <div class="test-section test">
+        <h2>🔗 Link Utili per Testing</h2>
+        <div class="links">
+            <a href="http://localhost:5173/login" target="_blank">📝 Pagina Login Frontend</a>
+            <a href="http://localhost:5173/forgot-password" target="_blank">🔐 Pagina Forgot Password Frontend</a>
+            <a href="http://localhost:5173/reset-password?email=test@example.com&token=test-token-123456789"
+                target="_blank">🆕 Pagina Reset Password (con parametri test)</a>
+            <a href="http://localhost:8000/test-login-errors.html" target="_blank">🧪 Test Login Errors (Backend)</a>
+            <a href="http://localhost:8000/test-password-recovery.html" target="_blank">🧪 Test Password Recovery
+                (Backend)</a>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Debug Info</h2>
+        <p><strong>Backend:</strong> Laravel su porta 8000</p>
+        <p><strong>Frontend:</strong> React su porta 5173</p>
+        <p><strong>Database:</strong> 15 utenti presenti, incluso test@example.com</p>
+        <p><strong>Console Logs:</strong> Aggiunti per debug del login</p>
+    </div>
+
+    <script>
+        async function makeRequest(endpoint, data) {
+            try {
+                const response = await fetch(`http://localhost:8000/api${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                return { status: response.status, data: result };
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        async function testLoginWrongEmail() {
+            console.log('🧪 Testing login with wrong email...');
+            const result = await makeRequest('/login', {
+                email: 'emailsbagliata@test.com',
+                password: 'password123'
+            });
+
+            document.getElementById('apiResult1').innerHTML = `
+                <strong>📡 Backend Response:</strong><br>
+                <strong>Status:</strong> ${result.status}<br>
+                <strong>Success:</strong> ${result.status === 401 ? '✅ Corretto (401 Unauthorized)' : '❌ Errore'}<br>
+                <strong>Response:</strong>
+                <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                <p><strong>Verifica:</strong> Il backend dovrebbe restituire 401 con messaggio di errore. Se così è, il problema è nel frontend.</p>
+            `;
+        }
+
+        async function testForgotPassword() {
+            const email = document.getElementById('forgotEmail').value;
+            console.log('🧪 Testing forgot password...');
+            const result = await makeRequest('/forgot-password', { email });
+
+            document.getElementById('apiResult2').innerHTML = `
+                <strong>📡 Backend Response:</strong><br>
+                <strong>Status:</strong> ${result.status}<br>
+                <strong>Success:</strong> ${result.status === 200 ? '✅ Richiesta OK' : '❌ Errore'}<br>
+                <strong>Response:</strong>
+                <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                <p><strong>Note:</strong> Il messaggio ora è onesto sul fatto che l'email non viene inviata realmente e include un link di test.</p>
+            `;
+        }
+
+        // Auto-test all'apertura della pagina
+        window.onload = function () {
+            console.log('🔧 Pagina di debug caricata');
+            console.log('🎯 Per testare i problemi:');
+            console.log('1. Usa i pulsanti qui sopra per testare le API');
+            console.log('2. Usa i link per testare il frontend');
+            console.log('3. Controlla sempre la Developer Console (F12)');
+        };
+    </script>
+</body>
+
+</html>

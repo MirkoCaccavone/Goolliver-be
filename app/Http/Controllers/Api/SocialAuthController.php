@@ -52,9 +52,8 @@ class SocialAuthController extends Controller
                 $redirectUrl = Socialite::driver($provider)->redirect()->getTargetUrl();
             }
 
-            return response()->json([
-                'redirect_url' => $redirectUrl
-            ]);
+            // Invece di restituire JSON, fai redirect diretto
+            return redirect($redirectUrl);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Errore durante il redirect',
@@ -159,10 +158,14 @@ class SocialAuthController extends Controller
                 $socialUser = Socialite::driver($provider)->user();
             }
         } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Errore durante il callback',
+            // Redirect al frontend con errore
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+            $redirectUrl = $frontendUrl . '/auth/callback?' . http_build_query([
+                'error' => 'true',
                 'message' => $e->getMessage()
-            ], 500);
+            ]);
+
+            return redirect($redirectUrl);
         }
 
         // Gestione unificata per tutti i provider
@@ -187,10 +190,15 @@ class SocialAuthController extends Controller
         // Genera token di accesso per API
         $token = $user->createToken('api_token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login effettuato con successo tramite ' . ucfirst($provider),
-            'user' => $user,
+        // Redirect al frontend con i dati dell'utente
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $redirectUrl = $frontendUrl . '/auth/callback?' . http_build_query([
             'token' => $token,
+            'user' => base64_encode(json_encode($user)),
+            'provider' => $provider,
+            'success' => 'true'
         ]);
+
+        return redirect($redirectUrl);
     }
 }
