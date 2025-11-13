@@ -90,15 +90,35 @@ class PhotoService
      */
     private function determineModerationStatus(array $moderationResult): string
     {
+        // Log per debug
+        Log::info('PhotoService determineModerationStatus:', [
+            'auto_approved' => $moderationResult['auto_approved'] ?? 'not set',
+            'score' => $moderationResult['score'] ?? 'not set',
+            'needs_human_review' => $moderationResult['needs_human_review'] ?? 'not set',
+            'full_result' => $moderationResult
+        ]);
+
+        // Se è auto-approvato, non serve revisione umana
         if ($moderationResult['auto_approved']) {
+            Log::info('PhotoService: Auto-approved, returning approved');
             return 'approved';
-        } elseif ($moderationResult['needs_human_review']) {
-            return 'pending_review';
-        } elseif ($moderationResult['score'] >= 0.9) {
-            return 'rejected';
-        } else {
-            return 'pending';
         }
+
+        // Se ha score molto alto (problema grave), rifiuta immediatamente
+        if ($moderationResult['score'] >= 0.9) {
+            Log::info('PhotoService: High score (>= 0.9), returning rejected');
+            return 'rejected';
+        }
+
+        // Se richiede revisione umana o ha score medio-alto
+        if ($moderationResult['needs_human_review'] || $moderationResult['score'] >= 0.7) {
+            Log::info('PhotoService: Needs review or score >= 0.7, returning pending_review');
+            return 'pending_review';
+        }
+
+        // Altrimenti è in pending (approvato automaticamente)
+        Log::info('PhotoService: Low score, returning approved');
+        return 'approved';
     }
 
     /**
@@ -261,7 +281,14 @@ class PhotoService
             );
 
             $moderationService = new ModerationService();
-            $result = $moderationService->moderatePhoto($tempFile);
+
+            // Log per debug filename processing
+            Log::info('Starting photo moderation', [
+                'original_filename' => $originalFile->getClientOriginalName(),
+                'temp_filename' => basename($tempFile)
+            ]);
+
+            $result = $moderationService->moderatePhoto($tempFile, [], $originalFile->getClientOriginalName());
 
             Log::info('Photo moderation completed', [
                 'original_filename' => $originalFile->getClientOriginalName(),
@@ -331,7 +358,7 @@ class PhotoService
 
         return [
             'original' => $originalPath,
-            'thumbnail' => $thumbnailPath,
+            'thumbnail' => "thumb_{$filename}", // Solo il nome del file, non il path completo
             'dimensions' => [
                 'width' => $imageInfo[0],
                 'height' => $imageInfo[1]

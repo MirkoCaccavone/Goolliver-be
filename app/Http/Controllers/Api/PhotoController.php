@@ -27,13 +27,40 @@ class PhotoController extends Controller
     public function upload(PhotoUploadRequest $request): JsonResponse
     {
         try {
+            Log::info('PhotoController upload started', [
+                'user_id' => Auth::id(),
+                'contest_id' => $request->contest_id,
+                'has_photo' => $request->hasFile('photo')
+            ]);
+
             $contest = Contest::findOrFail($request->contest_id);
 
+            // Debug contest status
+            $isActive = $contest->isActive();
+            $canParticipate = $contest->canUserParticipate(Auth::user());
+
+            Log::info('Contest participation check', [
+                'user_id' => Auth::id(),
+                'contest_id' => $contest->id,
+                'contest_status' => $contest->status,
+                'start_date' => $contest->start_date,
+                'end_date' => $contest->end_date,
+                'current_participants' => $contest->current_participants,
+                'max_participants' => $contest->max_participants,
+                'is_active' => $isActive,
+                'can_participate' => $canParticipate,
+                'now' => now()
+            ]);
+
             // Check if user can participate in this contest
-            if (!$contest->isActive() || !$contest->canUserParticipate(Auth::user())) {
+            if (!$isActive || !$canParticipate) {
                 return response()->json([
                     'error' => 'Non puoi partecipare a questo contest',
-                    'code' => 'CONTEST_NOT_AVAILABLE'
+                    'code' => 'CONTEST_NOT_AVAILABLE',
+                    'details' => [
+                        'is_active' => $isActive,
+                        'can_participate' => $canParticipate
+                    ]
                 ], 403);
             }
 
@@ -88,28 +115,21 @@ class PhotoController extends Controller
                     'contest_id' => $contest->id,
                     'payment_method' => $paymentMethod
                 ]);
-            }            // Upload and process photo
-            $photoData = $this->photoService->uploadPhoto(
+            }
+
+            // Upload and process photo - PhotoService creates the entry directly
+            $entry = $this->photoService->uploadPhoto(
                 $request->file('photo'),
-                $request->validated(),
-                Auth::id()
+                Auth::id(),
+                $contest->id,
+                $request->validated()
             );
 
-            // Create entry
-            $entry = Entry::create([
-                'user_id' => Auth::id(),
-                'contest_id' => $contest->id,
-                'title' => $request->title,
-                'description' => $request->description,
-                'photo_url' => $photoData['photo_url'],
-                'thumbnail_url' => $photoData['thumbnail_url'],
-                'file_size' => $photoData['file_size'],
-                'mime_type' => $photoData['mime_type'],
-                'dimensions' => $photoData['dimensions'],
-                'moderation_score' => $photoData['moderation_score'],
-                'moderation_status' => $photoData['moderation_status'],
-                'processing_status' => $photoData['processing_status'],
-                'metadata' => $photoData['metadata']
+            // Debug moderation status dopo upload
+            Log::info('PhotoController - Entry created', [
+                'entry_id' => $entry->id,
+                'moderation_status' => $entry->moderation_status,
+                'processing_status' => $entry->processing_status
             ]);
 
             return response()->json([

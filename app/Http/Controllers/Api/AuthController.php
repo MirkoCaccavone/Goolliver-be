@@ -212,4 +212,12 @@ class AuthController extends Controller
             'message' => 'Password reimpostata con successo. Ora puoi accedere con la nuova password.'
         ]);
     }
+
+    // Ottieni utente autenticato corrente
+    public function user(Request $request)
+    {
+        return response()->json([
+            'user' => $request->user()
+        ]);
+    }
 }

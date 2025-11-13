@@ -56,7 +56,7 @@ class ModerationService
     /**
      * Analizza una foto per contenuti inappropriati
      */
-    public function moderatePhoto(UploadedFile $photo, array $metadata = []): array
+    public function moderatePhoto(UploadedFile $photo, array $metadata = [], ?string $originalFilename = null): array
     {
         if (!$this->config['enabled']) {
             return $this->createSafeResult('Moderazione disabilitata');
@@ -66,7 +66,7 @@ class ModerationService
             $startTime = microtime(true);
 
             // Analisi con provider AI
-            $aiResult = $this->analyzeWithAI($photo);
+            $aiResult = $this->analyzeWithAI($photo, $originalFilename);
 
             // Analisi metadati (EXIF, dimensioni, etc.)
             $metadataResult = $this->analyzeMetadata($photo, $metadata);
@@ -76,14 +76,20 @@ class ModerationService
 
             $processingTime = round((microtime(true) - $startTime) * 1000, 2);
 
+            $requiresReview = $this->requiresManualReview($finalScore['overall_score']);
+            $baseStatus = $this->determineStatus($finalScore['overall_score']);
+
+            // Se richiede revisione manuale, forza pending_review
+            $finalStatus = $requiresReview ? 'pending_review' : $baseStatus;
+
             $result = [
-                'status' => $this->determineStatus($finalScore['overall_score']),
+                'status' => $finalStatus,
                 'overall_score' => $finalScore['overall_score'],
                 'categories' => $finalScore['categories'],
                 'confidence' => $finalScore['confidence'],
                 'provider' => $this->config['default_provider'],
                 'processing_time_ms' => $processingTime,
-                'requires_review' => $this->requiresManualReview($finalScore['overall_score']),
+                'requires_review' => $requiresReview,
                 'flagged_reasons' => $this->getFlaggedReasons($finalScore['categories']),
                 'metadata_analysis' => $metadataResult,
                 'timestamp' => now()->toISOString()
@@ -107,17 +113,17 @@ class ModerationService
     /**
      * Analizza con AI provider
      */
-    protected function analyzeWithAI(UploadedFile $photo): array
+    protected function analyzeWithAI(UploadedFile $photo, ?string $originalFilename = null): array
     {
         $provider = $this->config['default_provider'];
 
         switch ($provider) {
             case 'openai':
-                return $this->analyzeWithOpenAI($photo);
+                return $this->analyzeWithOpenAI($photo, $originalFilename);
             case 'google':
-                return $this->analyzeWithGoogleVision($photo);
+                return $this->analyzeWithGoogleVision($photo, $originalFilename);
             case 'aws':
-                return $this->analyzeWithAWSRekognition($photo);
+                return $this->analyzeWithAWSRekognition($photo, $originalFilename);
             default:
                 throw new ModerationException("Provider di moderazione non supportato: {$provider}");
         }
@@ -126,14 +132,14 @@ class ModerationService
     /**
      * Analisi con OpenAI Vision API
      */
-    protected function analyzeWithOpenAI(UploadedFile $photo): array
+    protected function analyzeWithOpenAI(UploadedFile $photo, ?string $originalFilename = null): array
     {
         $apiKey = config('moderation.providers.openai.api_key');
 
         // Se non c'è API key, usa mock
         if (empty($apiKey)) {
             Log::warning('OpenAI API key not configured, using mock analysis');
-            return $this->mockAnalysis($photo);
+            return $this->mockAnalysis($photo, $originalFilename);
         }
 
         try {
@@ -155,21 +161,21 @@ class ModerationService
     /**
      * Analisi con Google Vision API
      */
-    protected function analyzeWithGoogleVision(UploadedFile $photo): array
+    protected function analyzeWithGoogleVision(UploadedFile $photo, ?string $originalFilename = null): array
     {
         // TODO: Implementazione Google Vision API
         Log::info('Google Vision provider not implemented, using mock');
-        return $this->mockAnalysis($photo);
+        return $this->mockAnalysis($photo, $originalFilename);
     }
 
     /**
      * Analisi con AWS Rekognition
      */
-    protected function analyzeWithAWSRekognition(UploadedFile $photo): array
+    protected function analyzeWithAWSRekognition(UploadedFile $photo, ?string $originalFilename = null): array
     {
         // TODO: Implementazione AWS Rekognition API
         Log::info('AWS Rekognition provider not implemented, using mock');
-        return $this->mockAnalysis($photo);
+        return $this->mockAnalysis($photo, $originalFilename);
     }
 
     /**
@@ -295,9 +301,9 @@ class ModerationService
      * Implementazione mock per testing (migliorata per riconoscere contenuti sospetti)
      * Simula l'analisi del contenuto reale dell'immagine oltre al filename
      */
-    protected function mockAnalysis(UploadedFile $photo): array
+    protected function mockAnalysis(UploadedFile $photo, ?string $originalFilename = null): array
     {
-        $filename = strtolower($photo->getClientOriginalName());
+        $filename = strtolower($originalFilename ?? $photo->getClientOriginalName());
         $fileSize = $photo->getSize();
 
         // Inizializza categorie base
@@ -328,11 +334,18 @@ class ModerationService
         $suspiciousWords = [
             'nude' => 0.8,
             'naked' => 0.8,
+            'nudo' => 0.8,    // italiano
+            'nuda' => 0.8,    // italiano
+            'nudi' => 0.8,    // italiano
             'sex' => 0.9,
+            'sesso' => 0.9,   // italiano
             'porn' => 0.95,
+            'porno' => 0.95,  // italiano
             'xxx' => 0.9,
             'adult' => 0.7,
+            'adulti' => 0.7,  // italiano
             'erotic' => 0.8,
+            'erotico' => 0.8, // italiano
             'nsfw' => 0.85,
             'violence' => 0.6,
             'blood' => 0.5,
@@ -354,7 +367,7 @@ class ModerationService
                 $overallScore = max($overallScore, $filenameScore);
 
                 // Aumenta categorie specifiche (con peso ridotto se contenuto già rilevato)
-                if (in_array($word, ['nude', 'naked', 'sex', 'porn', 'xxx', 'adult', 'erotic', 'nsfw'])) {
+                if (in_array($word, ['nude', 'naked', 'nudo', 'nuda', 'nudi', 'sex', 'sesso', 'porn', 'porno', 'xxx', 'adult', 'adulti', 'erotic', 'erotico', 'nsfw'])) {
                     $categories['adult'] = max($categories['adult'], $filenameScore + mt_rand(-5, 5) / 100);
                 } elseif (in_array($word, ['violence', 'blood', 'gun', 'weapon'])) {
                     $categories['violence'] = max($categories['violence'], $filenameScore + mt_rand(-10, 5) / 100);
@@ -382,9 +395,9 @@ class ModerationService
 
         // 5. FOTO NORMALI (nessun contenuto o filename sospetto)
         if (!$detectedSuspiciousContent && !$detectedSuspiciousFilename) {
-            $overallScore = mt_rand(1, 12) / 100; // 1-12% per foto normali
+            $overallScore = mt_rand(1, 4) / 100; // 1-4% per foto normali - SOTTO soglia auto-approve
             foreach ($categories as $cat => $score) {
-                $categories[$cat] = mt_rand(0, 8) / 100;
+                $categories[$cat] = mt_rand(0, 3) / 100; // Anche categorie sotto soglia
             }
         }
 

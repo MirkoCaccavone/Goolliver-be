@@ -119,4 +119,31 @@ class Entry extends Model
     {
         return $query->orderBy('likes_count', $direction);
     }
+
+    // Accessors per URL completi
+    public function getPhotoUrlAttribute($value)
+    {
+        if (!$value) return null;
+
+        // Se è già un URL completo, restituiscilo così com'è
+        if (str_starts_with($value, 'http')) {
+            return $value;
+        }
+
+        // Altrimenti costruisci l'URL completo
+        return asset('storage/photos/' . $value);
+    }
+
+    public function getThumbnailUrlAttribute($value)
+    {
+        if (!$value) return null;
+
+        // Se è già un URL completo, restituiscilo così com'è
+        if (str_starts_with($value, 'http')) {
+            return $value;
+        }
+
+        // Altrimenti costruisci l'URL completo
+        return asset('storage/photos/thumbnails/' . $value);
+    }
 }

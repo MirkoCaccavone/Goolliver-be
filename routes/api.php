@@ -18,6 +18,26 @@ Route::get('/test', function () {
     return response()->json(['message' => 'API Goolliver attive!']);
 });
 
+// Debug contest endpoint
+Route::get('/debug/contest/{id}', function ($id) {
+    $contest = \App\Models\Contest::find($id);
+    if (!$contest) {
+        return response()->json(['error' => 'Contest not found']);
+    }
+
+    return response()->json([
+        'contest' => $contest->toArray(),
+        'now' => now()->toDateTimeString(),
+        'is_active_check' => [
+            'status_active' => $contest->status === 'active',
+            'start_date_ok' => $contest->start_date <= now(),
+            'end_date_ok' => $contest->end_date >= now(),
+            'participants_ok' => $contest->current_participants < $contest->max_participants
+        ],
+        'is_active' => $contest->isActive()
+    ]);
+});
+
 // System Test Routes
 Route::prefix('test')->group(function () {
     // Debug endpoint
@@ -165,6 +185,7 @@ Route::middleware(['throttle:3,1'])->post('/forgot-password', [AuthController::c
 Route::middleware(['throttle:3,1'])->post('/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // 📸 ROTTE PHOTO UPLOAD E GESTIONE

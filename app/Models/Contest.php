@@ -44,4 +44,31 @@ class Contest extends Model
     {
         return $this->hasManyThrough(Vote::class, Entry::class);
     }
+
+    /**
+     * Check if contest is currently active
+     */
+    public function isActive(): bool
+    {
+        $now = now();
+        return $this->status === 'active' &&
+            $this->start_date <= $now &&
+            $this->end_date >= $now &&
+            $this->current_participants < $this->max_participants;
+    }
+
+    /**
+     * Check if user can participate in this contest
+     */
+    public function canUserParticipate($user): bool
+    {
+        if (!$user || !$this->isActive()) {
+            return false;
+        }
+
+        // Check if user already has an entry for this contest
+        $existingEntry = $this->entries()->where('user_id', $user->id)->exists();
+
+        return !$existingEntry;
+    }
 }

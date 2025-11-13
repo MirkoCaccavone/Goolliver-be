@@ -131,9 +131,9 @@ class PhotoUploadRequest extends FormRequest
                     $width = $imageInfo[0];
                     $height = $imageInfo[1];
 
-                    // Minimum dimensions
-                    if ($width < 800 || $height < 600) {
-                        $validator->errors()->add('photo', 'L\'immagine deve essere almeno 800x600 pixel.');
+                    // Minimum dimensions - more reasonable for contest photos
+                    if ($width < 640 || $height < 480) {
+                        $validator->errors()->add('photo', 'L\'immagine deve essere almeno 640x480 pixel.');
                     }
 
                     // Maximum dimensions
@@ -141,10 +141,10 @@ class PhotoUploadRequest extends FormRequest
                         $validator->errors()->add('photo', 'L\'immagine non può superare 8000x8000 pixel.');
                     }
 
-                    // Aspect ratio check (optional)
+                    // Aspect ratio check - molto più permissivo per foto normali
                     $ratio = $width / $height;
-                    if ($ratio < 0.5 || $ratio > 3.0) {
-                        $validator->errors()->add('photo', 'L\'aspetto dell\'immagine non è supportato.');
+                    if ($ratio < 0.2 || $ratio > 5.0) {
+                        $validator->errors()->add('photo', 'L\'aspetto dell\'immagine è troppo estremo (troppo stretta o troppo larga).');
                     }
                 } else {
                     $validator->errors()->add('photo', 'Impossibile leggere le dimensioni dell\'immagine.');
