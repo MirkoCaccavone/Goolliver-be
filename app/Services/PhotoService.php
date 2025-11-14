@@ -64,6 +64,8 @@ class PhotoService
             'file_size' => $file->getSize(),
             'mime_type' => $file->getMimeType(),
             'dimensions' => $processedPaths['dimensions'],
+            'payment_status' => $data['payment_status'] ?? 'pending',
+            'payment_method' => $data['payment_method'] ?? null,
             'metadata' => [
                 'upload_timestamp' => now()->toISOString(),
                 'original_filename' => $file->getClientOriginalName(),

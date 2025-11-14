@@ -66,9 +66,12 @@ class Contest extends Model
             return false;
         }
 
-        // Check if user already has an entry for this contest
-        $existingEntry = $this->entries()->where('user_id', $user->id)->exists();
+        // Check if user already has a completed entry for this contest
+        $completedEntry = $this->entries()
+            ->where('user_id', $user->id)
+            ->where('payment_status', 'completed')
+            ->exists();
 
-        return !$existingEntry;
+        return !$completedEntry;
     }
 }

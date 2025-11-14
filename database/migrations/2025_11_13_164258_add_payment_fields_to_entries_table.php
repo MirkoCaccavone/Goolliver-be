@@ -13,15 +13,15 @@ return new class extends Migration
     {
         Schema::table('entries', function (Blueprint $table) {
             $table->enum('payment_status', ['pending', 'completed', 'failed', 'refunded'])
-                  ->default('pending')
-                  ->after('moderation_status');
-            
+                ->default('pending')
+                ->after('moderation_status');
+
             $table->timestamp('paid_at')->nullable()->after('payment_status');
-            
+
             $table->decimal('payment_amount', 8, 2)->nullable()->after('paid_at');
-            
+
             $table->string('payment_method', 50)->nullable()->after('payment_amount');
-            
+
             $table->string('transaction_id', 100)->nullable()->after('payment_method');
         });
     }
@@ -34,7 +34,7 @@ return new class extends Migration
         Schema::table('entries', function (Blueprint $table) {
             $table->dropColumn([
                 'payment_status',
-                'paid_at', 
+                'paid_at',
                 'payment_amount',
                 'payment_method',
                 'transaction_id'

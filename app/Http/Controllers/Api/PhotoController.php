@@ -64,16 +64,31 @@ class PhotoController extends Controller
                 ], 403);
             }
 
-            // Check if user already has an entry for this contest
-            $existingEntry = Entry::where('user_id', Auth::id())
+            // Check if user already has a completed entry for this contest
+            $completedEntry = Entry::where('user_id', Auth::id())
                 ->where('contest_id', $contest->id)
+                ->where('payment_status', 'completed')
                 ->first();
 
-            if ($existingEntry) {
+            if ($completedEntry) {
                 return response()->json([
                     'error' => 'Hai già caricato una foto per questo contest',
                     'code' => 'ENTRY_ALREADY_EXISTS'
                 ], 409);
+            }
+
+            // Check if user has a pending entry (incomplete payment)
+            $pendingEntry = Entry::where('user_id', Auth::id())
+                ->where('contest_id', $contest->id)
+                ->where('payment_status', 'pending')
+                ->first();
+
+            if ($pendingEntry) {
+                return response()->json([
+                    'error' => 'Hai già un caricamento in corso per questo contest. Completa il pagamento per finalizzare la partecipazione.',
+                    'code' => 'PAYMENT_PENDING',
+                    'entry_id' => $pendingEntry->id
+                ], 402);
             }
 
             // 💳 GESTIONE PAGAMENTO CON CREDITI
@@ -118,11 +133,16 @@ class PhotoController extends Controller
             }
 
             // Upload and process photo - PhotoService creates the entry directly
+            $photoData = array_merge($request->validated(), [
+                'payment_status' => $useCredits ? 'completed' : 'pending',
+                'payment_method' => $paymentMethod
+            ]);
+
             $entry = $this->photoService->uploadPhoto(
                 $request->file('photo'),
                 Auth::id(),
                 $contest->id,
-                $request->validated()
+                $photoData
             );
 
             // Debug moderation status dopo upload

@@ -176,6 +176,11 @@ Route::prefix('transactions')->group(function () {
     Route::delete('/{id}', [TransactionController::class, 'destroy']);  // elimina transazione
 });
 
+// Rotte Payments (pubbliche per test cards)
+Route::prefix('payments')->group(function () {
+    Route::get('/test-cards', [App\Http\Controllers\Api\PaymentController::class, 'getTestCards']);
+});
+
 // Rotte AuthController
 Route::middleware(['throttle:3,1'])->post('/register', [AuthController::class, 'register']);
 Route::middleware(['throttle:5,1'])->post('/login', [AuthController::class, 'login']);
@@ -216,6 +221,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Upload progress (per future implementazioni)
         Route::get('/upload-progress', [PhotoController::class, 'uploadProgress']);
+    });
+
+    // 💳 ROTTE PAYMENTS (AUTENTICATE)
+    Route::prefix('payments')->group(function () {
+        // Processa pagamento
+        Route::post('/process', [App\Http\Controllers\Api\PaymentController::class, 'processPayment'])
+            ->middleware(['throttle:3,1']); // Max 3 pagamenti al minuto
+
+        // Stato pagamento per entry
+        Route::get('/status/{entry}', [App\Http\Controllers\Api\PaymentController::class, 'getPaymentStatus']);
     });
 });
 
