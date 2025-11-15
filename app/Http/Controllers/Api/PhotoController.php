@@ -64,6 +64,12 @@ class PhotoController extends Controller
                 ], 403);
             }
 
+            // Elimina tutte le entry 'pending' per questo utente/contest (pulizia orfani da errori Stripe)
+            Entry::where('user_id', Auth::id())
+                ->where('contest_id', $contest->id)
+                ->where('payment_status', 'pending')
+                ->delete();
+
             // Check if user already has a completed entry for this contest
             $completedEntry = Entry::where('user_id', Auth::id())
                 ->where('contest_id', $contest->id)
@@ -75,20 +81,6 @@ class PhotoController extends Controller
                     'error' => 'Hai già caricato una foto per questo contest',
                     'code' => 'ENTRY_ALREADY_EXISTS'
                 ], 409);
-            }
-
-            // Check if user has a pending entry (incomplete payment)
-            $pendingEntry = Entry::where('user_id', Auth::id())
-                ->where('contest_id', $contest->id)
-                ->where('payment_status', 'pending')
-                ->first();
-
-            if ($pendingEntry) {
-                return response()->json([
-                    'error' => 'Hai già un caricamento in corso per questo contest. Completa il pagamento per finalizzare la partecipazione.',
-                    'code' => 'PAYMENT_PENDING',
-                    'entry_id' => $pendingEntry->id
-                ], 402);
             }
 
             // 💳 GESTIONE PAGAMENTO CON CREDITI
@@ -132,26 +124,23 @@ class PhotoController extends Controller
                 ]);
             }
 
-            // Upload and process photo - PhotoService creates the entry directly
+            // Upload and process photo: crea SEMPRE una entry
             $photoData = array_merge($request->validated(), [
                 'payment_status' => $useCredits ? 'completed' : 'pending',
                 'payment_method' => $paymentMethod
             ]);
-
             $entry = $this->photoService->uploadPhoto(
                 $request->file('photo'),
                 Auth::id(),
                 $contest->id,
                 $photoData
             );
-
-            // Debug moderation status dopo upload
             Log::info('PhotoController - Entry created', [
                 'entry_id' => $entry->id,
                 'moderation_status' => $entry->moderation_status,
-                'processing_status' => $entry->processing_status
+                'processing_status' => $entry->processing_status,
+                'payment_status' => $entry->payment_status
             ]);
-
             return response()->json([
                 'message' => 'Foto caricata con successo',
                 'entry' => [
@@ -161,6 +150,7 @@ class PhotoController extends Controller
                     'thumbnail_url' => $entry->thumbnail_url,
                     'processing_status' => $entry->processing_status,
                     'moderation_status' => $entry->moderation_status,
+                    'payment_status' => $entry->payment_status,
                     'created_at' => $entry->created_at
                 ],
                 'payment' => [
@@ -365,6 +355,13 @@ class PhotoController extends Controller
      */
     public function userPhotos(Request $request): JsonResponse
     {
+        // Cancella le entry 'pending' SOLO se richiesto (refresh dopo pagamento fallito)
+        if ($request->has('cleanup_pending') && $request->cleanup_pending == 1) {
+            Entry::where('user_id', Auth::id())
+                ->where('payment_status', 'pending')
+                ->delete();
+        }
+
         $query = Entry::with(['contest:id,title'])
             ->where('user_id', Auth::id());
 

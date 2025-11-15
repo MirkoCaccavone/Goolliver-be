@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 class Contest extends Model
 {
     protected $fillable = [
+        'id',
         'title',
         'description',
         'category',

@@ -26,6 +26,7 @@ class PaymentController extends Controller
             'payment_method_id' => 'required|string', // Stripe Payment Method ID
             'amount' => 'required|numeric|min:0.01',
         ]);
+        // Tutta la logica Stripe e pagamento è gestita nel blocco try/catch qui sotto
 
         try {
             // Configura Stripe
@@ -76,8 +77,53 @@ class PaymentController extends Controller
                 ]
             ]);
 
-            // Verifica che il pagamento sia stato confermato
-            if ($paymentIntent->status !== 'succeeded') {
+            // Gestione status intermedi di Stripe
+            $intermediateStatuses = [
+                'requires_action',
+                'requires_confirmation',
+                'processing'
+            ];
+            $failedStatuses = [
+                'canceled',
+                'failed',
+                'requires_payment_method',
+                'requires_capture'
+            ];
+            if (in_array($paymentIntent->status, $intermediateStatuses)) {
+                // Non eliminare la entry, restituisci info per completare autenticazione
+                DB::commit();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pagamento non completato: azione richiesta (autenticazione 3D Secure o conferma).',
+                    'payment_intent' => [
+                        'id' => $paymentIntent->id,
+                        'status' => $paymentIntent->status,
+                        'next_action' => $paymentIntent->next_action ?? null
+                    ]
+                ], 202);
+            }
+            if (in_array($paymentIntent->status, $failedStatuses)) {
+                // Log prima della delete
+                Log::warning('Pagamento fallito, elimino entry', [
+                    'entry_id' => $entry->id,
+                    'user_id' => Auth::id(),
+                    'payment_intent_status' => $paymentIntent->status,
+                    'stripe_payment_intent_id' => $paymentIntent->id
+                ]);
+                try {
+                    $entry->delete();
+                    Log::info('Entry eliminata dopo pagamento fallito', [
+                        'entry_id' => $entry->id
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Errore eliminazione entry dopo pagamento fallito', [
+                        'entry_id' => $entry->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Se la delete fallisce, aggiorna lo stato a failed
+                    $entry->update(['payment_status' => 'failed']);
+                }
+                DB::commit();
                 return response()->json([
                     'success' => false,
                     'message' => 'Pagamento non riuscito. Controlla i dati della carta.',
@@ -119,7 +165,33 @@ class PaymentController extends Controller
                 ]
             ]);
         } catch (\Stripe\Exception\CardException $e) {
+            // Elimina l'entry anche in caso di errore Stripe
             DB::rollBack();
+            $entry = Entry::find($request->entry_id);
+            Log::info('DEBUG: Stato entry prima della delete dopo CardError', [
+                'entry_id' => $request->entry_id ?? null,
+                'exists' => $entry ? true : false,
+                'payment_status' => $entry ? $entry->payment_status : null
+            ]);
+            if ($entry) {
+                try {
+                    $deletedRows = Entry::where('id', $entry->id)->delete();
+                    Log::info('Entry delete dopo Stripe Card Error', [
+                        'entry_id' => $entry->id,
+                        'deleted_rows' => $deletedRows
+                    ]);
+                    $entryCheck = Entry::find($entry->id);
+                    Log::info('DEBUG: Stato entry dopo delete CardError', [
+                        'entry_id' => $entry->id,
+                        'exists' => $entryCheck ? true : false
+                    ]);
+                } catch (\Exception $ex) {
+                    Log::error('DEBUG: Errore delete entry dopo CardError', [
+                        'entry_id' => $entry->id,
+                        'error' => $ex->getMessage()
+                    ]);
+                }
+            }
 
             Log::warning('Stripe Card Error', [
                 'error' => $e->getMessage(),
@@ -133,7 +205,38 @@ class PaymentController extends Controller
                 'message' => 'Carta rifiutata: ' . $e->getError()->message
             ], 400);
         } catch (\Stripe\Exception\InvalidRequestException $e) {
+            // Elimina l'entry anche in caso di errore Stripe
             DB::rollBack();
+            $entry = Entry::find($request->entry_id);
+            Log::info('DEBUG: Stato entry prima della delete dopo InvalidRequest', [
+                'entry_id' => $request->entry_id ?? null,
+                'exists' => $entry ? true : false,
+                'payment_status' => $entry ? $entry->payment_status : null
+            ]);
+            if ($entry) {
+                try {
+                    $entry->payment_status = 'failed';
+                    $entry->save();
+                    Log::info('Entry payment_status set to failed before delete', [
+                        'entry_id' => $entry->id
+                    ]);
+                    $deletedRows = Entry::where('id', $entry->id)->delete();
+                    Log::info('Entry hard delete dopo Stripe Invalid Request', [
+                        'entry_id' => $entry->id,
+                        'deleted_rows' => $deletedRows
+                    ]);
+                    $entryCheck = Entry::find($entry->id);
+                    Log::info('DEBUG: Stato entry dopo delete InvalidRequest', [
+                        'entry_id' => $entry->id,
+                        'exists' => $entryCheck ? true : false
+                    ]);
+                } catch (\Exception $ex) {
+                    Log::error('DEBUG: Errore delete entry dopo InvalidRequest', [
+                        'entry_id' => $entry->id,
+                        'error' => $ex->getMessage()
+                    ]);
+                }
+            }
 
             Log::error('Stripe Invalid Request', [
                 'error' => $e->getMessage(),
@@ -146,7 +249,34 @@ class PaymentController extends Controller
                 'message' => 'Richiesta non valida. Controlla i dati inseriti.'
             ], 400);
         } catch (\Exception $e) {
+            // Elimina l'entry associata SEMPRE dopo qualsiasi errore
             DB::rollBack();
+            $entry = Entry::find($request->entry_id);
+            Log::info('DEBUG: Stato entry prima della delete dopo Exception', [
+                'entry_id' => $request->entry_id ?? null,
+                'exists' => $entry ? true : false,
+                'payment_status' => $entry ? $entry->payment_status : null
+            ]);
+            if ($entry) {
+                try {
+                    $deletedRows = Entry::where('id', $entry->id)->delete();
+                    Log::warning('Entry eliminata dopo errore generico pagamento', [
+                        'entry_id' => $entry->id,
+                        'user_id' => Auth::id(),
+                        'deleted_rows' => $deletedRows
+                    ]);
+                    $entryCheck = Entry::find($entry->id);
+                    Log::info('DEBUG: Stato entry dopo delete Exception', [
+                        'entry_id' => $entry->id,
+                        'exists' => $entryCheck ? true : false
+                    ]);
+                } catch (\Exception $ex) {
+                    Log::error('DEBUG: Errore delete entry dopo Exception', [
+                        'entry_id' => $entry->id,
+                        'error' => $ex->getMessage()
+                    ]);
+                }
+            }
 
             Log::error('Stripe payment error', [
                 'error' => $e->getMessage(),

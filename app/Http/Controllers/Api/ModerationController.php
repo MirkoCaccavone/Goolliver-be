@@ -125,6 +125,22 @@ class ModerationController extends Controller
 
         $entry = Entry::findOrFail($entryId);
 
+        // Log di debug per verificare la relazione e lo stato
+        Log::info('DEBUG REJECT', [
+            'entry_id' => $entryId,
+            'entry_user_id' => $entry->user_id,
+            'entry_payment_status' => $entry->payment_status,
+            'entry_credit_given' => $entry->credit_given ?? false,
+            'user_found' => $entry->user ? $entry->user->email : null,
+            'user_photo_credits_before' => $entry->user ? $entry->user->photo_credits : null,
+        ]);
+        $request->validate([
+            'reason' => 'required|string|max:500',
+            'category' => 'required|string|in:adult,violence,hatred,harassment,self_harm,illegal,spam,inappropriate'
+        ]);
+
+        $entry = Entry::findOrFail($entryId);
+
         if ($entry->moderation_status === 'rejected') {
             return response()->json([
                 'status' => 'info',
@@ -132,25 +148,38 @@ class ModerationController extends Controller
             ]);
         }
 
-        $entry->update([
-            'moderation_status' => 'rejected',
-            'metadata' => array_merge($entry->metadata ?? [], [
-                'manual_rejection' => [
-                    'rejected_by' => Auth::id(),
-                    'rejected_at' => now()->toISOString(),
-                    'reason' => $request->reason,
-                    'category' => $request->category,
-                    'notes' => $request->get('notes'),
-                    'notify_user' => $request->boolean('notify_user', true)
-                ]
-            ])
+        // Assegna credito solo se la foto è stata pagata e non ha già ricevuto credito
+        $user = $entry->user;
+        $creditGiven = $entry->credit_given ?? false;
+        $wasPaid = $entry->payment_status === 'completed';
+
+        if ($wasPaid && !$creditGiven) {
+            // Incrementa i photo_credits dell'utente
+            $user->increment('photo_credits');
+            // Segna la foto come creditata
+            $entry->credit_given = true;
+        }
+
+        $entry->moderation_status = 'rejected';
+        $entry->metadata = array_merge($entry->metadata ?? [], [
+            'manual_rejection' => [
+                'rejected_by' => Auth::id(),
+                'rejected_at' => now()->toISOString(),
+                'reason' => $request->reason,
+                'category' => $request->category,
+                'notes' => $request->get('notes'),
+                'notify_user' => $request->boolean('notify_user', true)
+            ]
         ]);
+        $entry->save();
 
         Log::info('Photo manually rejected', [
             'entry_id' => $entryId,
             'rejected_by' => Auth::id(),
             'reason' => $request->reason,
-            'category' => $request->category
+            'category' => $request->category,
+            'credit_given' => $entry->credit_given,
+            'user_photo_credits' => $user->photo_credits
         ]);
 
         return response()->json([
