@@ -447,4 +447,6 @@ class PhotoController extends Controller
             'last_updated' => $user->updated_at
         ]);
     }
+
+    // ...existing code...
 }

@@ -395,4 +395,6 @@ class PhotoService
             return false;
         }
     }
+
+    // ...existing code...
 }

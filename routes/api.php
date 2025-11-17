@@ -128,7 +128,7 @@ Route::prefix('test')->group(function () {
             ], 500);
         }
     });
-});
+}); // <-- chiusura corretta del gruppo test
 
 // 🔐 AUTENTICAZIONE WEB
 // Route per reindirizzare alla pagina di login
@@ -198,6 +198,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Upload nuova foto
         Route::post('/upload', [PhotoController::class, 'upload'])
             ->middleware(['throttle:5,1']); // Max 5 upload al minuto
+
+        // ...existing code...
 
         // Gestione foto esistenti
         Route::put('/{entry}', [PhotoController::class, 'update'])
