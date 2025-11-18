@@ -11,7 +11,7 @@ class AdminModeratorSeeder extends Seeder
     public function run()
     {
         User::updateOrCreate([
-            'email' => 'admin@example.com'
+            'email' => 'admin@goolliver.com'
         ], [
             'name' => 'Admin',
             'password' => Hash::make('admin123'),
@@ -20,7 +20,7 @@ class AdminModeratorSeeder extends Seeder
         ]);
 
         User::updateOrCreate([
-            'email' => 'mod@example.com'
+            'email' => 'mod@goolliver.com'
         ], [
             'name' => 'Moderator',
             'password' => Hash::make('mod123'),
