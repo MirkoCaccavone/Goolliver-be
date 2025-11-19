@@ -46,6 +46,12 @@ class PhotoService
         $processedPaths = $this->processImage($tempPath, $filename);
 
         // 7. Creazione Entry nel database
+        $moderation_status = $this->determineModerationStatus($moderationResult);
+        $payment_status = $data['payment_status'] ?? 'pending';
+        $expires_at = null;
+        if ($payment_status === 'pending' && in_array($moderation_status, ['approved', 'pending', 'pending_review'])) {
+            $expires_at = now()->addSeconds(2);
+        }
         $entry = Entry::create([
             'user_id' => $userId,
             'contest_id' => $contestId,
@@ -58,14 +64,15 @@ class PhotoService
             'camera_model' => $data['camera_model'] ?? null,
             'settings' => $data['settings'] ?? null,
             'tags' => $data['tags'] ?? null,
-            'moderation_status' => $this->determineModerationStatus($moderationResult),
+            'moderation_status' => $moderation_status,
             'processing_status' => 'completed',
             'moderation_score' => $moderationResult['score'],
             'file_size' => $file->getSize(),
             'mime_type' => $file->getMimeType(),
             'dimensions' => $processedPaths['dimensions'],
-            'payment_status' => $data['payment_status'] ?? 'pending',
+            'payment_status' => $payment_status,
             'payment_method' => $data['payment_method'] ?? null,
+            'expires_at' => $expires_at,
             'metadata' => [
                 'upload_timestamp' => now()->toISOString(),
                 'original_filename' => $file->getClientOriginalName(),

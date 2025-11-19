@@ -155,6 +155,7 @@ Route::prefix('contests')->group(function () {
 Route::prefix('entries')->group(function () {
     Route::get('/', [EntryController::class, 'index']);          // lista di tutte le entries
     Route::post('/', [EntryController::class, 'store']);         // nuova entry (foto)
+    Route::get('/last', [EntryController::class, 'last']);       // ultima entry
     Route::get('/{id}', [EntryController::class, 'show']);       // singola entry
     Route::put('/{id}', [EntryController::class, 'update']);     // modifica entry
     Route::delete('/{id}', [EntryController::class, 'destroy']); // elimina entry
@@ -199,8 +200,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/upload', [PhotoController::class, 'upload'])
             ->middleware(['throttle:5,1']); // Max 5 upload al minuto
 
-        // ...existing code...
-
         // Gestione foto esistenti
         Route::put('/{entry}', [PhotoController::class, 'update'])
             ->middleware(['can:update,entry']);
@@ -229,7 +228,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('payments')->group(function () {
         // Processa pagamento
         Route::post('/process', [App\Http\Controllers\Api\PaymentController::class, 'processPayment'])
-            ->middleware(['throttle:3,1']); // Max 3 pagamenti al minuto
+            ->middleware(['throttle:20,1']); // Max 20 pagamenti al minuto
 
         // Stato pagamento per entry
         Route::get('/status/{entry}', [App\Http\Controllers\Api\PaymentController::class, 'getPaymentStatus']);

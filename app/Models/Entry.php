@@ -39,7 +39,8 @@ class Entry extends Model
         'views_count',
         'likes_count',
         'vote_score',
-        'credit_given'
+        'credit_given',
+        'expires_at'
     ];
 
     protected $casts = [
@@ -55,7 +56,8 @@ class Entry extends Model
         'vote_score' => 'decimal:2',
         'credit_given' => 'boolean',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'expires_at' => 'datetime'
     ];
 
     // Relazioni
