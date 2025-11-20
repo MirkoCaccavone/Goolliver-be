@@ -284,6 +284,31 @@ class PhotoService
     private function checkContentModeration(UploadedFile $originalFile, string $tempPath): array
     {
         try {
+            // Forza rifiuto se il titolo è "foto rifiutata"
+            if (isset($_POST['title']) && strtolower(trim($_POST['title'])) === 'foto rifiutata') {
+                Log::info('Photo moderation forced reject for test title', [
+                    'original_filename' => $originalFile->getClientOriginalName(),
+                    'title' => $_POST['title']
+                ]);
+                return [
+                    'auto_approved' => false,
+                    'score' => 1.0,
+                    'confidence' => 1.0,
+                    'flags' => [
+                        [
+                            'category' => 'test_reject',
+                            'score' => 1.0,
+                            'description' => 'Rifiuto forzato per test.'
+                        ]
+                    ],
+                    'needs_human_review' => false,
+                    'categories' => ['inappropriate' => 1.0],
+                    'provider' => 'test_forced',
+                    'processing_time' => 0,
+                    'full_result' => ['status' => 'rejected']
+                ];
+            }
+
             // Crea un UploadedFile temporaneo MA con il nome originale
             $tempFile = new UploadedFile(
                 $tempPath,
