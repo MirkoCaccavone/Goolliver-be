@@ -215,6 +215,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Crediti utente
         Route::get('/user/credits', [PhotoController::class, 'userCredits']);
+        // Voti ricevuti su tutte le foto
+        Route::get('/user/votes-summary', [PhotoController::class, 'userVotesSummary']);
 
         // Stato moderazione
         Route::get('/{entry}/moderation-status', [PhotoController::class, 'moderationStatus'])

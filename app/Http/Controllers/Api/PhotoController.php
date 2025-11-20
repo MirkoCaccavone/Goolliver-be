@@ -457,5 +457,22 @@ class PhotoController extends Controller
         ]);
     }
 
-    // ...existing code...
+    /**
+     * Restituisce il totale dei voti ricevuti su tutte le foto dell'utente
+     */
+    public function userVotesSummary(): JsonResponse
+    {
+        $userId = Auth::id();
+        // Somma tutti i voti sulle entries dell'utente
+        $totalVotes = \App\Models\Entry::where('user_id', $userId)
+            ->where('moderation_status', 'approved')
+            ->withCount('votes')
+            ->get()
+            ->sum('votes_count');
+
+        return response()->json([
+            'user_id' => $userId,
+            'total_votes' => $totalVotes
+        ]);
+    }
 }
