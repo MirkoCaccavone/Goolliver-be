@@ -83,7 +83,11 @@ class Entry extends Model
         return $this->hasMany(Vote::class)->where('vote_type', Vote::TYPE_LIKE);
     }
 
-
+    // Override del metodo increment per renderlo pubblico
+    public function increment($column, $amount = 1, array $extra = [])
+    {
+        return parent::increment($column, $amount, $extra);
+    }
 
     // Helper methods per i voti
     public function hasUserVoted($userId, $voteType = Vote::TYPE_LIKE)

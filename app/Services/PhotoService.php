@@ -8,6 +8,10 @@ use Illuminate\Http\UploadedFile;
 use App\Models\Entry;
 use Exception;
 
+/**
+ * Service per la gestione delle foto: upload, validazione, moderazione, processing, eliminazione.
+ * Responsabile di tutte le operazioni tecniche sulle immagini caricate dagli utenti.
+ */
 class PhotoService
 {
     const ALLOWED_MIME_TYPES = [

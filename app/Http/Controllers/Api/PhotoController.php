@@ -74,9 +74,11 @@ class PhotoController extends Controller
             $completedEntry = Entry::where('user_id', Auth::id())
                 ->where('contest_id', $contest->id)
                 ->where('payment_status', 'completed')
+                ->orderByDesc('id')
                 ->first();
 
-            if ($completedEntry) {
+            // Permetti nuova partecipazione se non esiste entry completata o se l'ultima è stata rifiutata
+            if ($completedEntry && $completedEntry->moderation_status !== 'rejected') {
                 return response()->json([
                     'error' => 'Hai già caricato una foto per questo contest',
                     'code' => 'ENTRY_ALREADY_EXISTS'

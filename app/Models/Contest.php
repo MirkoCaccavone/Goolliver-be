@@ -67,12 +67,18 @@ class Contest extends Model
             return false;
         }
 
-        // Check if user already has a completed entry for this contest
-        $completedEntry = $this->entries()
+        // Trova l'ultima entry completata per questo contest
+        $lastCompletedEntry = $this->entries()
             ->where('user_id', $user->id)
             ->where('payment_status', 'completed')
-            ->exists();
+            ->orderByDesc('id')
+            ->first();
 
-        return !$completedEntry;
+        // Permetti di partecipare se non esiste entry completata o se l'ultima è stata rifiutata
+        if (!$lastCompletedEntry || $lastCompletedEntry->moderation_status === 'rejected') {
+            return true;
+        }
+
+        return false;
     }
 }
