@@ -105,10 +105,20 @@ class SocialAuthController extends Controller
                     throw new \Exception('Email non fornita da Facebook. Per utilizzare Goolliver è necessario autorizzare l\'accesso all\'email. Riprova il login e autorizza l\'email.');
                 }
 
+                // Recupera foto profilo Facebook con access token
+                $pictureResponse = Http::withoutVerifying()->get('https://graph.facebook.com/me/picture', [
+                    'access_token' => $token,
+                    'type' => 'large',
+                    'redirect' => false
+                ]);
+                $pictureData = $pictureResponse->json();
+                $fbAvatarUrl = isset($pictureData['data']['url']) ? $pictureData['data']['url'] : null;
+
                 $socialUser = (object) [
                     'id' => $fbUser['id'],
                     'name' => $fbUser['name'] ?? 'User Facebook',
-                    'email' => $fbUser['email']  // NESSUN FALLBACK - email obbligatoria
+                    'email' => $fbUser['email'],
+                    'avatar' => $fbAvatarUrl
                 ];
             } elseif ($provider === 'google') {
                 // Gestione manuale per Google
@@ -173,6 +183,14 @@ class SocialAuthController extends Controller
         $userName = in_array($provider, ['facebook', 'google']) ? $socialUser->name : $socialUser->getName();
         $userEmail = in_array($provider, ['facebook', 'google']) ? $socialUser->email : $socialUser->getEmail();
 
+        // Recupera foto profilo
+        $avatarUrl = null;
+        if ($provider === 'google' && isset($googleUser['picture'])) {
+            $avatarUrl = $googleUser['picture'];
+        } elseif ($provider === 'facebook' && isset($socialUser->avatar)) {
+            $avatarUrl = $socialUser->avatar;
+        }
+
         $user = User::updateOrCreate(
             [
                 'provider' => $provider,
@@ -184,6 +202,7 @@ class SocialAuthController extends Controller
                 'password' => null, // Password nulla per utenti social
                 'provider' => $provider,
                 'provider_id' => $providerId,
+                'avatar' => $avatarUrl,
             ]
         );
 

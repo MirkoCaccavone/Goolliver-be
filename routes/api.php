@@ -192,6 +192,7 @@ Route::middleware(['throttle:3,1'])->post('/reset-password', [AuthController::cl
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
+    Route::patch('/user', [AuthController::class, 'update']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // 📸 ROTTE PHOTO UPLOAD E GESTIONE

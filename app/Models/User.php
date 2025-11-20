@@ -17,6 +17,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'avatar',
         'password',
         'phone',        // campo facoltativo
         'provider',     // login tramite social (es. google, facebook)

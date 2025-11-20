@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Support\Facades\Log;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+
+use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
@@ -210,6 +214,56 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Password reimpostata con successo. Ora puoi accedere con la nuova password.'
+        ]);
+    }
+
+
+    // Aggiorna profilo utente (nome, avatar)
+    public function update(Request $request)
+    {
+        $user = $request->user();
+
+        Log::info('PATCH /user ricevuto', [
+            'name' => $request->input('name'),
+            'all' => $request->all(),
+            'has_name' => $request->has('name'),
+            'avatar' => $request->file('avatar'),
+        ]);
+
+        $request->validate([
+            'name' => 'nullable|string|min:2|max:255',
+            'avatar' => 'nullable|image|max:4096', // max 4MB
+        ]);
+
+        $data = [];
+        if ($request->has('name')) {
+            $data['name'] = $request->input('name');
+        }
+        if ($request->has('email')) {
+            $data['email'] = $request->input('email');
+        }
+        if ($request->has('phone')) {
+            $data['phone'] = $request->input('phone');
+        }
+
+        // Se remove_avatar è true, rimuovi avatar e cancella file
+        if ($request->has('remove_avatar') && $request->input('remove_avatar') === 'true') {
+            if ($user->avatar && str_starts_with($user->avatar, '/storage/')) {
+                $avatarPath = str_replace('/storage/', '', $user->avatar);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($avatarPath);
+            }
+            $data['avatar'] = null;
+        } elseif ($request->hasFile('avatar')) {
+            // Salva avatar in storage/app/public/avatars
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar'] = '/storage/' . $path;
+        }
+
+        $user->update($data);
+
+        return response()->json([
+            'message' => 'Profilo aggiornato',
+            'user' => $user->fresh()
         ]);
     }
 
