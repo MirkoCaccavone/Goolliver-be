@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PhotoController extends Controller
@@ -27,6 +28,7 @@ class PhotoController extends Controller
     public function upload(PhotoUploadRequest $request): JsonResponse
     {
         try {
+            DB::beginTransaction();
             Log::info('PhotoController upload started', [
                 'user_id' => Auth::id(),
                 'contest_id' => $request->contest_id,
@@ -93,6 +95,7 @@ class PhotoController extends Controller
             if ($useCredits) {
                 // Verifica che l'utente abbia almeno 1 credito
                 if ($user->photo_credits < 1) {
+                    DB::rollBack();
                     return response()->json([
                         'error' => 'Non hai abbastanza crediti per caricare una foto',
                         'current_credits' => $user->photo_credits,
@@ -137,6 +140,7 @@ class PhotoController extends Controller
                 $contest->id,
                 $photoData
             );
+            DB::commit();
             Log::info('PhotoController - Entry created', [
                 'entry_id' => $entry->id,
                 'moderation_status' => $entry->moderation_status,
@@ -162,17 +166,20 @@ class PhotoController extends Controller
                 ]
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
             return response()->json([
                 'error' => 'Dati non validi',
                 'code' => 'VALIDATION_ERROR',
                 'details' => $e->errors()
             ], 422);
         } catch (\App\Exceptions\PhotoUploadException $e) {
+            DB::rollBack();
             return response()->json([
                 'error' => $e->getMessage(),
                 'code' => $e->getErrorCode()
             ], 400);
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Photo upload failed', [
                 'user_id' => Auth::id(),
                 'contest_id' => $request->contest_id,
