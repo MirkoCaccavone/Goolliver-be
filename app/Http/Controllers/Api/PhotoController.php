@@ -141,6 +141,8 @@ class PhotoController extends Controller
                 $photoData
             );
             DB::commit();
+
+
             Log::info('PhotoController - Entry created', [
                 'entry_id' => $entry->id,
                 'moderation_status' => $entry->moderation_status,
@@ -265,6 +267,11 @@ class PhotoController extends Controller
             // Delete physical files
             $this->photoService->deletePhoto($entry);
 
+            // Decrementa current_participants del contest
+            $contest = $entry->contest;
+            if ($contest && $contest->current_participants > 0) {
+                $contest->decrement('current_participants');
+            }
             // Delete entry
             $entry->delete();
 

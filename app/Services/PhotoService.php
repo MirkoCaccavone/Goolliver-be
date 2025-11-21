@@ -95,6 +95,10 @@ class PhotoService
         // 8. Cleanup temp file
         Storage::disk('temp_uploads')->delete($filename);
 
+
+        // 8. Cleanup temp file
+        Storage::disk('temp_uploads')->delete($filename);
+
         return $entry;
     }
 

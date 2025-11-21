@@ -9,8 +9,20 @@ use App\Models\Entry;
 
 class ContestController extends Controller
 {
+    /**
+     * Aggiorna lo stato dei contest: upcoming -> active se la data di inizio è oggi/passata
+     */
+    public static function updateContestStatuses()
+    {
+        $now = now();
+        Contest::where('status', 'upcoming')
+            ->whereDate('start_date', '<=', $now)
+            ->update(['status' => 'active']);
+    }
+
     public function index()
     {
+        self::updateContestStatuses();
         return response()->json(Contest::all());
     }
 
@@ -21,15 +33,33 @@ class ContestController extends Controller
             'description' => 'nullable|string',
             'max_participants' => 'required|integer|min:1',
             'prize' => 'nullable|string',
-            'status' => 'nullable|string|in:open,voting,closed',
+            'entry_fee' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string|in:active,upcoming,ended,voting',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
         ]);
+
+        // Determina lo stato contest in base alla data di inizio
+        $now = now();
+        $startDate = $request->start_date;
+        $status = $request->status;
+        if (!$status) {
+            if ($startDate > $now) {
+                $status = 'upcoming';
+            } else {
+                $status = 'active';
+            }
+        }
 
         $contest = Contest::create([
             'title' => $request->title,
             'description' => $request->description,
             'max_participants' => $request->max_participants,
             'prize' => $request->prize,
-            'status' => $request->status ?? 'open', // default value
+            'entry_fee' => $request->entry_fee ?? 0,
+            'status' => $status,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
         ]);
 
         return response()->json($contest, 201);

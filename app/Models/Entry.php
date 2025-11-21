@@ -11,6 +11,39 @@ class Entry extends Model
 {
     use HasFactory;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($entry) {
+            if ($entry->payment_status === 'completed') {
+                $contest = $entry->contest;
+                if ($contest) {
+                    $contest->increment('current_participants');
+                }
+            }
+        });
+
+        static::updated(function ($entry) {
+            if ($entry->isDirty('payment_status') && $entry->payment_status === 'completed' && $entry->getOriginal('payment_status') !== 'completed') {
+                $contest = $entry->contest;
+                if ($contest) {
+                    $contest->increment('current_participants');
+                }
+            }
+        });
+
+        static::deleted(function ($entry) {
+            if ($entry->payment_status === 'completed') {
+                $contest = $entry->contest;
+                if ($contest && $contest->current_participants > 0) {
+                    $contest->decrement('current_participants');
+                }
+            }
+        });
+    }
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'contest_id',

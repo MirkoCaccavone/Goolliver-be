@@ -52,10 +52,11 @@ class Contest extends Model
     public function isActive(): bool
     {
         $now = now();
-        return $this->status === 'active' &&
-            $this->start_date <= $now &&
-            $this->end_date >= $now &&
-            $this->current_participants < $this->max_participants;
+        // Un contest è attivo solo se status è 'active', la data di inizio è passata, la data di fine non è ancora passata, e non si è raggiunto il limite partecipanti
+        return $this->status === 'active'
+            && $this->start_date <= $now
+            && $this->end_date >= $now
+            && $this->current_participants < $this->max_participants;
     }
 
     /**

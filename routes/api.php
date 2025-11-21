@@ -144,7 +144,7 @@ Route::get('/quick-login/{userId}', [App\Http\Controllers\WebAuthController::cla
 // Rotte Contest
 Route::prefix('contests')->group(function () {
     Route::get('/', [ContestController::class, 'index']);          // lista concorsi
-    Route::post('/', [ContestController::class, 'store']);         // crea concorso
+    Route::post('/', [ContestController::class, 'store'])->middleware(['auth:sanctum', 'admin']); // crea concorso solo admin
     Route::get('/{id}', [ContestController::class, 'show']);       // singolo concorso
     Route::get('/{id}/entries', [ContestController::class, 'entries']); // entries del concorso (solo pubbliche)
     Route::put('/{id}', [ContestController::class, 'update']);     // aggiorna concorso
