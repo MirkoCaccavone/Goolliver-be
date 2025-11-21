@@ -274,4 +274,18 @@ class AuthController extends Controller
             'user' => $request->user()
         ]);
     }
+
+    // Cancella l'account utente autenticato
+    public function destroy(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Utente non trovato'], 404);
+        }
+        // Cancella tutte le risorse collegate se necessario (foto, entries, ecc.)
+        // Esempio: $user->photos()->delete();
+        // Cancella l'utente
+        $user->delete();
+        return response()->json(['message' => 'Account eliminato con successo']);
+    }
 }

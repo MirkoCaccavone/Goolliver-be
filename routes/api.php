@@ -194,6 +194,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::patch('/user', [AuthController::class, 'update']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::delete('/user', [AuthController::class, 'destroy']);
 
     // 📸 ROTTE PHOTO UPLOAD E GESTIONE
     Route::prefix('photos')->group(function () {
