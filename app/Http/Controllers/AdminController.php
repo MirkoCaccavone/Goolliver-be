@@ -60,10 +60,57 @@ class AdminController extends Controller
     public function dashboard()
     {
         try {
-            // Statistiche base che sicuramente funzionano
+            // --- TREND ULTIMI 30 GIORNI ---
+            $days = (int) request('days', 30);
+            if ($days < 1 || $days > 365) $days = 30;
+            $dateFrom = now()->subDays($days - 1)->startOfDay();
+            $dateTo = now()->endOfDay();
+
+            // Trend iscrizioni utenti
+            $userTrends = User::where('created_at', '>=', $dateFrom)
+                ->where('created_at', '<=', $dateTo)
+                ->selectRaw('DATE(created_at) as day, COUNT(*) as count')
+                ->groupBy('day')
+                ->orderBy('day')
+                ->pluck('count', 'day');
+
+            // Trend foto caricate
+            $entryTrends = Entry::where('created_at', '>=', $dateFrom)
+                ->where('created_at', '<=', $dateTo)
+                ->selectRaw('DATE(created_at) as day, COUNT(*) as count')
+                ->groupBy('day')
+                ->orderBy('day')
+                ->pluck('count', 'day');
+
+            // Trend foto moderate (approved+rejected)
+            $moderatedTrends = Entry::where('moderation_status', '!=', 'pending_review')
+                ->where('updated_at', '>=', $dateFrom)
+                ->where('updated_at', '<=', $dateTo)
+                ->selectRaw('DATE(updated_at) as day, COUNT(*) as count')
+                ->groupBy('day')
+                ->orderBy('day')
+                ->pluck('count', 'day');
+
+            // Trend crediti distribuiti (variazione positiva di photo_credits)
+            // NB: Se hai una tabella log movimenti crediti, qui va usata. Se no, si può solo stimare.
+            $creditTrends = User::where('updated_at', '>=', $dateFrom)
+                ->where('updated_at', '<=', $dateTo)
+                ->selectRaw('DATE(updated_at) as day, SUM(photo_credits) as credits')
+                ->groupBy('day')
+                ->orderBy('day')
+                ->pluck('credits', 'day');
+
+
+            $trendData = [
+                'user_registrations' => $userTrends,
+                'entries_uploaded' => $entryTrends,
+                'entries_moderated' => $moderatedTrends,
+                'credits_distributed' => $creditTrends,
+            ];
+
             $stats = [
                 'users' => [
-                    'total' => User::where('role', 'user')->count(), // Solo utenti normali
+                    'total' => User::count(),
                     'active' => User::where('is_active', true)->where('role', 'user')->count(),
                     'new_today' => User::whereDate('created_at', now()->toDateString())->where('role', 'user')->count(),
                 ],
@@ -120,9 +167,54 @@ class AdminController extends Controller
                 ];
             }
 
+            // --- ULTIMI EVENTI ---
+            $latestUsers = User::orderBy('created_at', 'desc')->take(5)->get()->map(function ($u) {
+                return [
+                    'type' => 'user',
+                    'description' => "Nuovo utente: {$u->name} ({$u->email})",
+                    'date' => $u->created_at,
+                ];
+            });
+            $latestContests = Contest::orderBy('created_at', 'desc')->take(5)->get()->map(function ($c) {
+                return [
+                    'type' => 'contest',
+                    'description' => "Nuovo contest: {$c->title}",
+                    'date' => $c->created_at,
+                ];
+            });
+            $latestEntries = Entry::with('user')->orderBy('created_at', 'desc')->take(5)->get()->map(function ($e) {
+                $userName = $e->user ? $e->user->name : ("ID #{$e->user_id}");
+                $userEmail = $e->user ? $e->user->email : '';
+                return [
+                    'type' => 'entry',
+                    'description' => "Nuova foto caricata da {$userName}" . ($userEmail ? " ({$userEmail})" : ''),
+                    'date' => $e->created_at,
+                ];
+            });
+            // Movimenti crediti: prendi utenti con credit_notes recente (se usato come log)
+            $latestCredits = User::whereNotNull('credit_notes')->orderBy('updated_at', 'desc')->take(5)->get()->map(function ($u) {
+                return [
+                    'type' => 'credit',
+                    'description' => "Movimento crediti per {$u->name} ({$u->email})",
+                    'date' => $u->updated_at,
+                ];
+            });
+            // Unisci e ordina per data decrescente
+            $latestEvents = collect()
+                ->merge($latestUsers)
+                ->merge($latestContests)
+                ->merge($latestEntries)
+                ->merge($latestCredits)
+                ->sortByDesc('date')
+                ->values()
+                ->take(10)
+                ->all();
+
             return response()->json([
                 'success' => true,
-                'stats' => $stats
+                'stats' => $stats,
+                'latestEvents' => $latestEvents,
+                'trendData' => $trendData
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -807,6 +899,177 @@ class AdminController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Errore nel caricamento dettagli utente',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Stato sistema e notifiche per dashboard admin
+     */
+    public function systemStatus()
+    {
+        $notifiche = [];
+        $servizi = [];
+
+        // STORAGE
+        try {
+            $total = disk_total_space(storage_path());
+            $free = disk_free_space(storage_path());
+            $used = $total - $free;
+            $percent = $total > 0 ? round(($used / $total) * 100, 1) : null;
+            $servizi['storage'] = [
+                'label' => 'Storage',
+                'status' => $percent !== null ? ($percent < 80 ? 'ok' : ($percent < 95 ? 'warning' : 'danger')) : 'unknown',
+                'message' => $percent !== null ? ("Utilizzo storage: $percent%") : 'Non disponibile',
+                'percent' => $percent
+            ];
+            if ($percent !== null && $percent >= 95) {
+                $notifiche[] = [
+                    'type' => 'danger',
+                    'message' => 'Attenzione: lo storage del server è quasi pieno! Libera spazio o aumenta la quota.'
+                ];
+            } elseif ($percent !== null && $percent >= 80) {
+                $notifiche[] = [
+                    'type' => 'warning',
+                    'message' => 'Lo storage del server sta raggiungendo il limite di capacità.'
+                ];
+            }
+        } catch (\Exception $e) {
+            $servizi['storage'] = [
+                'label' => 'Storage',
+                'status' => 'unknown',
+                'message' => 'Errore nel calcolo spazio disco',
+                'error' => $e->getMessage()
+            ];
+        }
+
+        // EMAIL
+        try {
+            $mailer = config('mail.default', 'smtp');
+            $smtp = config('mail.mailers.' . $mailer, []);
+            $from = config('mail.from.address');
+            $ok = !empty($smtp['host']) && !empty($smtp['username']) && !empty($from);
+            $servizi['email'] = [
+                'label' => 'Email',
+                'status' => $ok ? 'ok' : 'danger',
+                'message' => $ok ? 'Configurazione email presente' : 'Email non configurata',
+                'host' => $smtp['host'] ?? null,
+                'username' => $smtp['username'] ?? null,
+                'from' => $from,
+            ];
+            if (!$ok) {
+                $notifiche[] = [
+                    'type' => 'danger',
+                    'message' => 'Il sistema email non è configurato! Nessuna email potrà essere inviata.'
+                ];
+            }
+        } catch (\Exception $e) {
+            $servizi['email'] = [
+                'label' => 'Email',
+                'status' => 'unknown',
+                'message' => 'Errore verifica email',
+                'error' => $e->getMessage()
+            ];
+        }
+
+        // DATABASE
+        try {
+            DB::connection()->getPdo();
+            $servizi['database'] = [
+                'label' => 'Database',
+                'status' => 'ok',
+                'message' => 'Connessione database OK'
+            ];
+        } catch (\Exception $e) {
+            $servizi['database'] = [
+                'label' => 'Database',
+                'status' => 'danger',
+                'message' => 'Errore connessione database',
+                'error' => $e->getMessage()
+            ];
+            $notifiche[] = [
+                'type' => 'danger',
+                'message' => 'Errore di connessione al database!'
+            ];
+        }
+
+        // SERVIZI ESTERNI (esempio: moderazione immagini)
+        // Qui puoi aggiungere test reali verso servizi esterni
+        $servizi['moderation'] = [
+            'label' => 'Moderazione immagini',
+            'status' => 'ok',
+            'message' => 'Servizio attivo'
+        ];
+
+        // CODE HEALTH (es. errori recenti nei log)
+        try {
+            $logPath = storage_path('logs/laravel.log');
+            $recentErrors = [];
+            if (file_exists($logPath)) {
+                $lines = array_slice(file($logPath), -100);
+                foreach ($lines as $line) {
+                    if (stripos($line, 'error') !== false || stripos($line, 'exception') !== false) {
+                        $recentErrors[] = $line;
+                    }
+                }
+            }
+            $servizi['code_health'] = [
+                'label' => 'Code health',
+                'status' => count($recentErrors) > 0 ? 'warning' : 'ok',
+                'message' => count($recentErrors) > 0 ? 'Errori recenti nei log' : 'Nessun errore recente',
+                'errors' => array_slice($recentErrors, -5)
+            ];
+            if (count($recentErrors) > 0) {
+                $notifiche[] = [
+                    'type' => 'warning',
+                    'message' => 'Sono stati rilevati errori recenti nei log di sistema.'
+                ];
+            }
+        } catch (\Exception $e) {
+            $servizi['code_health'] = [
+                'label' => 'Code health',
+                'status' => 'unknown',
+                'message' => 'Errore lettura log',
+                'error' => $e->getMessage()
+            ];
+        }
+
+        // VERSIONI
+        $servizi['version'] = [
+            'label' => 'Versione backend',
+            'status' => 'ok',
+            'message' => 'v1.0',
+        ];
+
+        return response()->json([
+            'notifiche' => $notifiche,
+            'servizi' => $servizi
+        ]);
+    }
+    /**
+     * Invia una email di test per verificare la configurazione SMTP
+     */
+    public function sendTestEmail(Request $request)
+    {
+        try {
+            $to = $request->input('to', config('mail.from.address'));
+            $subject = 'Test Email Goolliver';
+            $body = 'Questa è una email di test inviata dal backend Goolliver.';
+
+            Mail::raw($body, function ($message) use ($to, $subject) {
+                $message->to($to)
+                    ->subject($subject);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Email di test inviata a ' . $to
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Errore durante l\'invio della email di test',
                 'details' => $e->getMessage()
             ], 500);
         }

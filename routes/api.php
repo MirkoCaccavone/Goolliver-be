@@ -514,6 +514,10 @@ use App\Http\Controllers\AdminController;
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
     // Dashboard
     Route::get('/dashboard', [AdminController::class, 'dashboard']);
+    // Stato sistema e notifiche
+    Route::get('/system-status', [AdminController::class, 'systemStatus']);
+    // Azione rapida: invio email di test
+    Route::post('/send-test-email', [AdminController::class, 'sendTestEmail']);
 
     // Gestione utenti
     Route::get('/users', [AdminController::class, 'users']);
