@@ -17,6 +17,44 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class AdminController extends Controller
 {
     /**
+     * Elimina un utente (solo admin)
+     */
+    public function deleteUser($userId)
+    {
+        try {
+            $user = User::findOrFail($userId);
+            $currentUser = Auth::user();
+            // Protezione: un admin non può eliminare se stesso
+            if ($user->id === $currentUser->id) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Non puoi eliminare il tuo stesso account da admin!',
+                ], 403);
+            }
+            // Protezione: non eliminare l'ultimo admin attivo
+            if ($user->role === 'admin' && $user->is_active) {
+                $activeAdminsCount = User::where('role', 'admin')->where('is_active', true)->count();
+                if ($activeAdminsCount <= 1) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Non puoi eliminare l\'ultimo amministratore attivo! Crea prima un altro admin.',
+                    ], 403);
+                }
+            }
+            $user->delete();
+            return response()->json([
+                'success' => true,
+                'message' => 'Utente eliminato con successo.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Errore durante l\'eliminazione utente',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
      * Dashboard principale con statistiche generali
      */
     public function dashboard()
@@ -54,7 +92,7 @@ class AdminController extends Controller
             // Aggiungiamo statistiche di moderazione se i campi esistono
             try {
                 $stats['entries']['approved'] = Entry::where('moderation_status', 'approved')->count();
-                $stats['entries']['pending'] = Entry::where('moderation_status', 'pending')->count();
+                $stats['entries']['pending'] = Entry::where('moderation_status', 'pending_review')->count();
                 $stats['entries']['rejected'] = Entry::where('moderation_status', 'rejected')->count();
             } catch (\Exception $e) {
                 // Se i campi di moderazione non esistono, usiamo valori di default
@@ -499,6 +537,12 @@ class AdminController extends Controller
             if ($shouldGiveCredit) {
                 $user = $entry->user;
                 $user->increment('photo_credits');
+                // Aggiorna le note sui crediti (aggiunta credito)
+                $creditNote = "Credito aggiunto manualmente da admin";
+                $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
+                $user->update([
+                    'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
+                ]);
 
                 // 🎯 IMPORTANTE: Segniamo che questa entry ha dato un credito
                 $entry->update(['credit_given' => true]);
@@ -685,7 +729,7 @@ class AdminController extends Controller
             // Movimenti di crediti per periodo (ultimi 30 giorni)
             $creditMovements = User::where('credit_notes', '!=', '')
                 ->where('updated_at', '>=', now()->subDays(30))
-                ->get(['id', 'name', 'photo_credits', 'credit_notes', 'updated_at'])
+                ->get(['id', 'name', 'email', 'photo_credits', 'credit_notes', 'updated_at'])
                 ->map(function ($user) {
                     $lines = array_filter(explode("\n", $user->credit_notes));
                     $recentNotes = array_slice(array_reverse($lines), 0, 5); // Ultime 5 note
@@ -693,6 +737,7 @@ class AdminController extends Controller
                     return [
                         'user_id' => $user->id,
                         'user_name' => $user->name,
+                        'email' => $user->email,
                         'current_credits' => $user->photo_credits,
                         'recent_movements' => $recentNotes,
                         'last_update' => $user->updated_at
@@ -713,6 +758,55 @@ class AdminController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Errore nel caricamento degli analytics crediti',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Dettaglio utente per admin: dati, contest, foto
+     */
+    public function userDetail($userId)
+    {
+        Log::info('Admin userDetail start', ['userId' => $userId]);
+        try {
+            $user = User::findOrFail($userId);
+            Log::info('Admin userDetail user trovato', ['user' => $user]);
+            // Contest a cui partecipa (entries con user_id)
+            $contests = \App\Models\Contest::whereHas('entries', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })->get(['id', 'title', 'start_date', 'end_date', 'status']);
+            Log::info('Admin userDetail contests', ['contests_count' => $contests->count()]);
+            // Foto caricate (entries)
+            $photos = \App\Models\Entry::where('user_id', $userId)
+                ->get([
+                    'id',
+                    'title',
+                    'photo_url',
+                    'thumbnail_url',
+                    'created_at',
+                    'moderation_status',
+                    'contest_id',
+                    'payment_method',
+                    'votes_count',
+                    'likes_count',
+                    'views_count',
+                    'description',
+                    'location'
+                ]);
+            Log::info('Admin userDetail photos', ['photos_count' => $photos->count()]);
+            return response()->json([
+                'success' => true,
+                'user' => $user,
+                'photo_credits' => $user->photo_credits,
+                'contests' => $contests,
+                'photos' => $photos
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Admin userDetail error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Errore nel caricamento dettagli utente',
                 'details' => $e->getMessage()
             ], 500);
         }

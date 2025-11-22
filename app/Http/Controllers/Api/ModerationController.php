@@ -156,6 +156,12 @@ class ModerationController extends Controller
         if ($wasPaid && !$creditGiven) {
             // Incrementa i photo_credits dell'utente
             $user->increment('photo_credits');
+            // Aggiorna le note sui crediti (aggiunta credito)
+            $creditNote = "Credito aggiunto per moderazione foto rifiutata (Entry #{$entry->id})";
+            $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
+            $user->update([
+                'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
+            ]);
             // Segna la foto come creditata
             $entry->credit_given = true;
         }

@@ -517,8 +517,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Gestione utenti
     Route::get('/users', [AdminController::class, 'users']);
+    Route::get('/users/{userId}', [AdminController::class, 'userDetail']);
     Route::patch('/users/{userId}/role', [AdminController::class, 'updateUserRole']);
     Route::patch('/users/{userId}/status', [AdminController::class, 'toggleUserStatus']);
+    Route::delete('/users/{userId}', [AdminController::class, 'deleteUser']);
 
     // Gestione contest
     Route::get('/contests', [AdminController::class, 'contests']);
