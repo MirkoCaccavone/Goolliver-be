@@ -628,25 +628,25 @@ class AdminController extends Controller
             // Gestiamo i crediti DOPO l'update
             if ($shouldGiveCredit) {
                 $user = $entry->user;
-                $user->increment('photo_credits');
+                $user->increment('photo_credits', 10); // Accredita 10 crediti
                 // Aggiorna le note sui crediti (aggiunta credito)
-                $creditNote = "Credito aggiunto manualmente da admin";
+                $creditNote = "10 crediti aggiunti manualmente da admin";
                 $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
                 $user->update([
                     'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
                 ]);
 
-                // 🎯 IMPORTANTE: Segniamo che questa entry ha dato un credito
+                // 🎯 IMPORTANTE: Segniamo che questa entry ha dato credito
                 $entry->update(['credit_given' => true]);
 
                 // Aggiorna le note sui crediti
-                $creditNote = "Credito assegnato per foto rifiutata (Entry #{$entry->id}) - Motivo: " . ($request->reason ?: 'Non specificato');
+                $creditNote = "10 crediti assegnati per foto rifiutata (Entry #{$entry->id}) - Motivo: " . ($request->reason ?: 'Non specificato');
                 $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
                 $user->update([
                     'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
                 ]);
 
-                Log::info('Credito assegnato', [
+                Log::info('Crediti assegnati', [
                     'user_id' => $user->id,
                     'entry_id' => $entry->id,
                     'new_credits' => $user->fresh()->photo_credits,
@@ -658,7 +658,7 @@ class AdminController extends Controller
                     Mail::to($user->email)->send(new PhotoRejectedMail(
                         $entry->fresh(),
                         $request->reason ?: 'Non specificato',
-                        1 // crediti assegnati
+                        10 // crediti assegnati
                     ));
 
                     Log::info('Email di rifiuto foto inviata', [

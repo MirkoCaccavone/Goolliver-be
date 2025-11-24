@@ -93,28 +93,28 @@ class PhotoController extends Controller
             $useCredits = $paymentMethod === 'credit';
 
             if ($useCredits) {
-                // Verifica che l'utente abbia almeno 1 credito
-                if ($user->photo_credits < 1) {
+                // Verifica che l'utente abbia almeno 10 crediti
+                if ($user->photo_credits < 10) {
                     DB::rollBack();
                     return response()->json([
                         'error' => 'Non hai abbastanza crediti per caricare una foto',
                         'current_credits' => $user->photo_credits,
-                        'required_credits' => 1,
+                        'required_credits' => 10,
                         'code' => 'INSUFFICIENT_CREDITS'
                     ], 402); // 402 Payment Required
                 }
 
-                // Scala il credito PRIMA dell'upload
-                $user->decrement('photo_credits');
+                // Scala 10 crediti PRIMA dell'upload
+                $user->decrement('photo_credits', 10);
 
                 // Aggiorna le note sui crediti
-                $creditNote = "Credito utilizzato per caricamento foto - Contest: " . $contest->title;
+                $creditNote = "10 crediti utilizzati per caricamento foto - Contest: " . $contest->title;
                 $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
                 $user->update([
                     'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
                 ]);
 
-                Log::info('Credito utilizzato per upload', [
+                Log::info('Crediti utilizzati per upload', [
                     'user_id' => $user->id,
                     'contest_id' => $contest->id,
                     'credits_remaining' => $user->fresh()->photo_credits

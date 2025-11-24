@@ -52,18 +52,24 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            // Verifica che l'importo corrisponda al costo del contest
-            $expectedAmount = $entry->contest->entry_fee ?? 0;
-            if (abs($request->amount - $expectedAmount) > 0.01) {
+            // Calcola sconto crediti
+            $user = \App\Models\User::find($entry->user_id);
+            $entryFee = $entry->contest->entry_fee ?? 2.0;
+            $maxCredits = min($user->photo_credits, 10);
+            $creditValue = 0.20;
+            $discount = $maxCredits * $creditValue;
+            $finalAmount = round(max($entryFee - $discount, 0), 2);
+
+            if ($finalAmount < 0.01) {
                 return response()->json([
                     'success' => false,
-                    'message' => "L'importo non corrisponde al costo del contest (€{$expectedAmount})"
+                    'message' => 'Importo troppo basso dopo sconto crediti.'
                 ], 400);
             }
 
             // Crea Payment Intent con Stripe
             $paymentIntent = PaymentIntent::create([
-                'amount' => $request->amount * 100, // Stripe usa centesimi
+                'amount' => $finalAmount * 100, // Stripe usa centesimi
                 'currency' => config('stripe.currency', 'eur'),
                 'payment_method' => $request->payment_method_id,
                 'confirmation_method' => 'manual',
@@ -73,7 +79,10 @@ class PaymentController extends Controller
                     'entry_id' => $entry->id,
                     'user_id' => Auth::id(),
                     'contest_id' => $entry->contest_id,
-                    'contest_title' => $entry->contest->title ?? 'Contest'
+                    'contest_title' => $entry->contest->title ?? 'Contest',
+                    'used_credits' => $maxCredits,
+                    'credit_discount' => $discount,
+                    'final_amount' => $finalAmount
                 ]
             ]);
 
@@ -134,14 +143,26 @@ class PaymentController extends Controller
                 ], 400);
             }
 
+
             // Aggiorna l'entry con i dati di pagamento
             $entry->update([
                 'payment_status' => 'completed',
                 'paid_at' => now(),
-                'payment_amount' => $request->amount,
+                'payment_amount' => $finalAmount,
                 'payment_method' => 'stripe_card',
                 'transaction_id' => $paymentIntent->id
             ]);
+
+            // Scala i crediti solo dopo pagamento riuscito
+            if ($maxCredits > 0) {
+                $user->decrement('photo_credits', $maxCredits);
+                // Aggiorna le note sui crediti
+                $creditNote = "$maxCredits crediti utilizzati per sconto pagamento entry #{$entry->id}";
+                $existingNotes = $user->credit_notes ? $user->credit_notes . "\n" : '';
+                $user->update([
+                    'credit_notes' => $existingNotes . date('Y-m-d H:i:s') . ': ' . $creditNote
+                ]);
+            }
 
             DB::commit();
 

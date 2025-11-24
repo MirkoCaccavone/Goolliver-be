@@ -45,16 +45,29 @@ class EntryController extends Controller
 
         // Stato moderazione e pagamento
         $moderation_status = $request->input('moderation_status', 'pending');
-        $payment_status = $request->input('payment_status', 'pending');
+        $user = \App\Models\User::find($request->user_id);
+        $payment_status = 'pending';
         $expires_at = null;
+        $used_credits = 0;
+
+        if ($user && $user->photo_credits >= 10) {
+            // L'utente ha almeno 10 crediti: li usa per caricare gratis
+            $user->decrement('photo_credits', 10);
+            $used_credits = 10;
+            $payment_status = 'completed';
+        }
+
         // Imposta la scadenza solo se la entry è pending e moderata
         if ($payment_status === 'pending' && in_array($moderation_status, ['approved', 'pending', 'pending_review'])) {
             $expires_at = now()->addSeconds(2);
         }
+
         // Log di debug
         Log::info('[ENTRY] payment_status ricevuto:', ['payment_status' => $payment_status]);
         Log::info('[ENTRY] moderation_status ricevuto:', ['moderation_status' => $moderation_status]);
         Log::info('[ENTRY] expires_at calcolato:', ['expires_at' => $expires_at]);
+        Log::info('[ENTRY] used_credits:', ['used_credits' => $used_credits]);
+
         // Crea la entry nel database
         $entry = Entry::create([
             'user_id' => $request->user_id,
@@ -68,8 +81,9 @@ class EntryController extends Controller
 
         // Risposta con la entry creata
         return response()->json([
-            'message' => 'Entry creata con successo!',
+            'message' => $used_credits ? 'Entry creata usando 10 crediti!' : 'Entry creata, completa il pagamento.',
             'data' => $entry,
+            'used_credits' => $used_credits,
         ], 201);
     }
 
