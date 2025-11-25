@@ -45,12 +45,15 @@ class PhotoController extends Controller
     public function publicContestPhotos()
     {
         // Recupera tutti i contest attivi
-        $contests = Contest::where('status', 'active')->get();
+        $contests = \App\Models\Contest::where('status', 'active')->get();
 
         $photos = [];
         foreach ($contests as $contest) {
-            // Recupera tutte le entries con photo_url per ogni contest attivo
-            $entries = $contest->entries()->whereNotNull('photo_url')->get(['id', 'photo_url']);
+            // Recupera solo le entries con photo_url e moderation_status 'approved'
+            $entries = $contest->entries()
+                ->whereNotNull('photo_url')
+                ->where('moderation_status', 'approved')
+                ->get(['id', 'photo_url']);
             foreach ($entries as $entry) {
                 $photos[] = [
                     'id' => $entry->id,
