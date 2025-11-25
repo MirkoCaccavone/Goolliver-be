@@ -18,6 +18,53 @@ use Illuminate\Support\Facades\Log;
 
 class PhotoController extends Controller
 {
+
+    public function index()
+    {
+        // Recupera tutti i contest attivi
+        $contests = Contest::where('status', 'active')->get();
+
+        $photos = [];
+        foreach ($contests as $contest) {
+            // Recupera tutte le entries con photo_url per ogni contest attivo
+            $entries = $contest->entries()->whereNotNull('photo_url')->get(['id', 'photo_url']);
+            foreach ($entries as $entry) {
+                $photos[] = [
+                    'id' => $entry->id,
+                    'photo_url' => $entry->photo_url,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'photos' => $photos,
+        ]);
+    }
+
+    public function publicContestPhotos()
+    {
+        // Recupera tutti i contest attivi
+        $contests = Contest::where('status', 'active')->get();
+
+        $photos = [];
+        foreach ($contests as $contest) {
+            // Recupera tutte le entries con photo_url per ogni contest attivo
+            $entries = $contest->entries()->whereNotNull('photo_url')->get(['id', 'photo_url']);
+            foreach ($entries as $entry) {
+                $photos[] = [
+                    'id' => $entry->id,
+                    'photo_url' => $entry->photo_url,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'photos' => $photos,
+        ]);
+    }
+
     public function __construct(
         private PhotoService $photoService
     ) {}

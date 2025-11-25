@@ -541,3 +541,6 @@ Route::middleware(['auth:sanctum', 'moderator'])->prefix('moderation')->group(fu
     Route::patch('/entries/{entryId}/moderate', [AdminController::class, 'moderateEntry'])
         ->middleware('throttle:30,1'); // Max 30 moderazioni al minuto per prevenire spam
 });
+
+// Rotte pubbliche per le foto dei contest attivi
+Route::get('/public/contest-photos', [\App\Http\Controllers\Api\PhotoController::class, 'publicContestPhotos']);
