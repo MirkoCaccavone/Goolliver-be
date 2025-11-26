@@ -46,7 +46,8 @@ class SocialAuthController extends Controller
                     'redirect_uri' => $config['redirect'],
                     'scope' => 'openid email profile',
                     'response_type' => 'code',
-                    'state' => csrf_token()
+                    'state' => csrf_token(),
+                    'prompt' => 'select_account'
                 ]);
             } else {
                 $redirectUrl = Socialite::driver($provider)->redirect()->getTargetUrl();
