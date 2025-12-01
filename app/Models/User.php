@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -91,5 +92,26 @@ class User extends Authenticatable
     public function getUnreadNotificationsCountAttribute()
     {
         return $this->unreadNotifications()->count();
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($user) {
+            if ($user->avatar) {
+                $disk = Storage::disk('public');
+                $avatarFile = basename($user->avatar);
+                $avatarPaths = [
+                    'avatars/' . $avatarFile,
+                    'avatars\\' . $avatarFile // per compatibilità Windows
+                ];
+                foreach ($avatarPaths as $avatarPath) {
+                    if ($disk->exists($avatarPath)) {
+                        $disk->delete($avatarPath);
+                    }
+                }
+            }
+        });
     }
 }

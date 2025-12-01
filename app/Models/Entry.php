@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 // Le foto inviate dagli utenti per un concorso
 
@@ -38,6 +40,23 @@ class Entry extends Model
                 $contest = $entry->contest;
                 if ($contest && $contest->current_participants > 0) {
                     $contest->decrement('current_participants');
+                }
+            }
+            // Cancella i file associati (original e thumbnail)
+            $disk = Storage::disk('public');
+            if ($entry->photo_url && $disk->exists($entry->photo_url)) {
+                $disk->delete($entry->photo_url);
+            }
+            if ($entry->thumbnail_url) {
+                // Cerca sia in photos/thumbnail che photos/thumbnails per sicurezza
+                $thumbPaths = [
+                    'photos/thumbnail/' . $entry->thumbnail_url,
+                    'photos/thumbnails/' . $entry->thumbnail_url
+                ];
+                foreach ($thumbPaths as $thumbPath) {
+                    if ($disk->exists($thumbPath)) {
+                        $disk->delete($thumbPath);
+                    }
                 }
             }
         });
