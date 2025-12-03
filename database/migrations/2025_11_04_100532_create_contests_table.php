@@ -19,7 +19,7 @@ return new class extends Migration
             $table->dateTime('start_at')->nullable();
             $table->dateTime('end_at')->nullable();
             $table->string('prize')->nullable();
-            $table->enum('status', ['open', 'voting', 'closed'])->default('open');
+            $table->enum('status', ['active', 'upcoming', 'voting', 'ended'])->default('upcoming');
             $table->timestamps();
         });
     }

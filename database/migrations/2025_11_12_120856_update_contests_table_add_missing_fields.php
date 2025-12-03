@@ -22,13 +22,11 @@ return new class extends Migration
             $table->integer('current_participants')->default(0)->after('max_participants');
             $table->string('category')->nullable()->after('description');
             $table->decimal('entry_fee', 8, 2)->default(0)->after('prize');
-
-            // Aggiorno l'enum status con i nuovi valori
-            $table->dropColumn('status');
         });
 
         Schema::table('contests', function (Blueprint $table) {
-            $table->enum('status', ['active', 'upcoming', 'ended', 'open', 'voting', 'closed'])->default('upcoming')->after('entry_fee');
+            // Aggiorna l'enum status: elimina 'open' e 'closed', lascia solo quelli necessari
+            $table->enum('status', ['active', 'upcoming', 'voting', 'ended'])->default('upcoming')->change();
         });
     }
 
@@ -40,14 +38,11 @@ return new class extends Migration
         Schema::table('contests', function (Blueprint $table) {
             // Rimuovo i campi aggiunti
             $table->dropColumn(['current_participants', 'category', 'entry_fee']);
-
-            // Ripristino l'enum status originale
-            $table->dropColumn('status');
         });
 
         Schema::table('contests', function (Blueprint $table) {
-            $table->enum('status', ['open', 'voting', 'closed'])->default('open');
-
+            // Ripristina i vecchi valori dell'enum se necessario
+            $table->enum('status', ['active', 'upcoming', 'ended', 'open', 'voting', 'closed'])->default('upcoming')->change();
             // Ripristino i nomi delle colonne originali
             $table->renameColumn('start_date', 'start_at');
             $table->renameColumn('end_date', 'end_at');
