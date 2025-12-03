@@ -44,8 +44,8 @@ class PhotoController extends Controller
 
     public function publicContestPhotos()
     {
-        // Recupera tutti i contest attivi
-        $contests = \App\Models\Contest::where('status', 'active')->get();
+        // Recupera tutti i contest con status 'active', 'pending_voting' o 'voting'
+        $contests = \App\Models\Contest::whereIn('status', ['active', 'pending_voting', 'voting'])->get();
 
         $photos = [];
         foreach ($contests as $contest) {
