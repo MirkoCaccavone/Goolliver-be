@@ -17,6 +17,38 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class AdminController extends Controller
 {
     /**
+     * Imposta la durata della votazione e fa partire la fase di voting
+     */
+    public function setVotingDays(Request $request, $contestId)
+    {
+        try {
+            $request->validate([
+                'voting_days' => 'required|integer|min:1|max:30',
+            ]);
+            $contest = Contest::findOrFail($contestId);
+            if ($contest->status !== 'pending_voting') {
+                return response()->json(['success' => false, 'error' => 'Contest non in stato pending_voting'], 400);
+            }
+            $now = now();
+            $contest->status = 'voting';
+            $contest->voting_end_date = $now->copy()->addDays((int)$request->voting_days);
+            $contest->save();
+            $contest->refresh();
+            return response()->json(['success' => true, 'contest' => $contest]);
+        } catch (\Exception $e) {
+            Log::error('Errore setVotingDays: ' . $e->getMessage(), [
+                'contestId' => $contestId ?? null,
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
+        }
+    }
+    /**
      * Elimina un utente (solo admin)
      */
     public function deleteUser($userId)

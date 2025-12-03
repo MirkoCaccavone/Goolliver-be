@@ -19,12 +19,14 @@ class Contest extends Model
         'max_participants',
         'current_participants',
         'prize',
-        'entry_fee'
+        'entry_fee',
+        'voting_end_date'
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'voting_end_date' => 'datetime',
         'entry_fee' => 'decimal:2',
         'current_participants' => 'integer',
         'max_participants' => 'integer',
@@ -52,10 +54,12 @@ class Contest extends Model
     public function isActive(): bool
     {
         $now = now();
-        // Un contest è attivo solo se status è 'active', la data di inizio è passata, la data di fine non è ancora passata, e non si è raggiunto il limite partecipanti
+        // Un contest è attivo se status è 'active', la data di inizio è passata, non si è raggiunto il limite partecipanti,
+        // e (se end_date è valorizzata) non è ancora passata
+        $dateOk = is_null($this->end_date) || $this->end_date >= $now;
         return $this->status === 'active'
             && $this->start_date <= $now
-            && $this->end_date >= $now
+            && $dateOk
             && $this->current_participants < $this->max_participants;
     }
 

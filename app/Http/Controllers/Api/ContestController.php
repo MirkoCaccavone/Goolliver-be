@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Support\Facades\Log;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Contest;
 use App\Models\Entry;
+use App\Models\Vote;
 
 class ContestController extends Controller
 {
@@ -15,9 +18,44 @@ class ContestController extends Controller
     public static function updateContestStatuses()
     {
         $now = now();
+        // upcoming -> active se la data di inizio è oggi/passata
         Contest::where('status', 'upcoming')
             ->whereDate('start_date', '<=', $now)
             ->update(['status' => 'active']);
+
+        // active -> pending_voting se raggiunto il numero massimo di partecipanti
+        $pendingVotingContests = Contest::where('status', 'active')
+            ->whereColumn('current_participants', '>=', 'max_participants')
+            ->get();
+        foreach ($pendingVotingContests as $contest) {
+            $contest->status = 'pending_voting';
+            $contest->save();
+            // Notifica tutti gli admin
+            foreach (\App\Models\User::admins() as $admin) {
+                Log::info('Creazione notifica admin', [
+                    'admin_id' => $admin->id,
+                    'contest_id' => $contest->id,
+                    'contest_title' => $contest->title
+                ]);
+                $admin->notifications()->create([
+                    'type' => 'contest_pending_voting',
+                    'title' => $contest->title,
+                    'message' => "Il contest '{$contest->title}' ha raggiunto il numero massimo di partecipanti. Scegli la durata della votazione.",
+                    'data' => [
+                        'contest_id' => $contest->id,
+                        'title' => $contest->title,
+                        'message' => "Il contest '{$contest->title}' ha raggiunto il numero massimo di partecipanti. Scegli la durata della votazione.",
+                        'url' => "/admin/contests/{$contest->id}/details"
+                    ]
+                ]);
+            }
+        }
+
+        // voting -> ended se la voting_end_date è passata
+        Contest::where('status', 'voting')
+            ->whereNotNull('voting_end_date')
+            ->where('voting_end_date', '<', $now)
+            ->update(['status' => 'ended']);
     }
 
     public function index()
@@ -36,7 +74,7 @@ class ContestController extends Controller
             'entry_fee' => 'nullable|numeric|min:0',
             'status' => 'nullable|string|in:active,upcoming,ended,voting',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'end_date' => 'nullable|date|after_or_equal:start_date', // ora facoltativo
         ]);
 
         // Determina lo stato contest in base alla data di inizio
@@ -59,7 +97,7 @@ class ContestController extends Controller
             'entry_fee' => $request->entry_fee ?? 0,
             'status' => $status,
             'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
+            'end_date' => $request->end_date, // può essere null
         ]);
 
         return response()->json($contest, 201);
@@ -91,6 +129,25 @@ class ContestController extends Controller
     {
         $contest = Contest::findOrFail($id);
         $entries = $contest->entries()->public()->get();
+
+        $userId = request()->user() ? request()->user()->id : null;
+        if ($userId) {
+            // Preleva tutti gli entry_id votati dall'utente per questo contest
+            $votedEntryIds = Vote::where('user_id', $userId)
+                ->whereIn('entry_id', $entries->pluck('id'))
+                ->where('vote_type', 'like')
+                ->pluck('entry_id')
+                ->toArray();
+        } else {
+            $votedEntryIds = [];
+        }
+
+        // Aggiungi la proprietà voted_by_user a ciascuna entry
+        $entries->transform(function ($entry) use ($votedEntryIds) {
+            $entry->voted_by_user = in_array($entry->id, $votedEntryIds);
+            return $entry;
+        });
+
         return response()->json($entries);
     }
 }

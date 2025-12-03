@@ -13,6 +13,14 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
+     * Recupera tutti gli admin attivi
+     */
+    public static function admins()
+    {
+        return self::where('role', 'admin')->where('is_active', true)->get();
+    }
+
+    /**
      * I campi assegnabili in massa
      */
     protected $fillable = [
