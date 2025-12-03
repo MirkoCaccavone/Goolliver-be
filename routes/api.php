@@ -7,7 +7,7 @@ use App\Http\Controllers\Api\ModerationController;
 use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\VoteController;
+use App\Http\Controllers\Api\VoteController;
 use App\Http\Controllers\EmailTestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -146,7 +146,7 @@ Route::prefix('contests')->group(function () {
     Route::get('/', [ContestController::class, 'index']);          // lista concorsi
     Route::post('/', [ContestController::class, 'store'])->middleware(['auth:sanctum', 'admin']); // crea concorso solo admin
     Route::get('/{id}', [ContestController::class, 'show']);       // singolo concorso
-    Route::get('/{id}/entries', [ContestController::class, 'entries']); // entries del concorso (solo pubbliche)
+    Route::get('/{id}/entries', [ContestController::class, 'entries'])->middleware('auth:sanctum'); // entries del concorso (solo pubbliche, voted_by_user richiede auth)
     Route::put('/{id}', [ContestController::class, 'update']);     // aggiorna concorso
     Route::delete('/{id}', [ContestController::class, 'destroy']); // elimina concorso
 });
@@ -259,183 +259,183 @@ Route::prefix('email-preview')->group(function () {
 });
 
 // 🔒 NOTIFICHE WEB - Autenticazione con cookie (PRIMA del gruppo auth:sanctum)
-Route::get('/notifications/view-test', function (Illuminate\Http\Request $request) {
-    return response()->json([
-        'message' => 'Route raggiunta con successo!',
-        'cookies' => $request->cookies->all(),
-        'token' => $request->cookie('auth_token')
-    ]);
-});
+// Route::get('/notifications/view-test', function (Illuminate\Http\Request $request) {
+//     return response()->json([
+//         'message' => 'Route raggiunta con successo!',
+//         'cookies' => $request->cookies->all(),
+//         'token' => $request->cookie('auth_token')
+//     ]);
+// });
 
-Route::get('/notifications/view', function (Illuminate\Http\Request $request) {
-    try {
-        // Debug completo per capire il problema
-        $token = $request->cookie('auth_token');
-        $allCookies = $request->cookies->all();
+// Route::get('/notifications/view', function (Illuminate\Http\Request $request) {
+//     try {
+//         // Debug completo per capire il problema
+//         $token = $request->cookie('auth_token');
+//         $allCookies = $request->cookies->all();
 
-        // Se non c'è token, mostra debug completo
-        if (!$token) {
-            return response()->json([
-                'error' => 'Token non trovato nei cookie',
-                'debug' => [
-                    'cookies_presenti' => array_keys($allCookies),
-                    'tutti_i_cookies' => $allCookies,
-                    'auth_token_specifico' => $request->cookie('auth_token'),
-                    'headers' => $request->headers->all()
-                ]
-            ], 400);
-        }
+//         // Se non c'è token, mostra debug completo
+//         if (!$token) {
+//             return response()->json([
+//                 'error' => 'Token non trovato nei cookie',
+//                 'debug' => [
+//                     'cookies_presenti' => array_keys($allCookies),
+//                     'tutti_i_cookies' => $allCookies,
+//                     'auth_token_specifico' => $request->cookie('auth_token'),
+//                     'headers' => $request->headers->all()
+//                 ]
+//             ], 400);
+//         }
 
-        // Verifica il token manualmente
-        $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+//         // Verifica il token manualmente
+//         $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
 
-        if (!$accessToken) {
-            return response()->json([
-                'error' => 'Token non valido',
-                'debug' => [
-                    'token_ricevuto' => substr($token, 0, 20) . '...',
-                    'token_length' => strlen($token),
-                    'database_check' => 'Token non trovato nel database'
-                ]
-            ], 400);
-        }
+//         if (!$accessToken) {
+//             return response()->json([
+//                 'error' => 'Token non valido',
+//                 'debug' => [
+//                     'token_ricevuto' => substr($token, 0, 20) . '...',
+//                     'token_length' => strlen($token),
+//                     'database_check' => 'Token non trovato nel database'
+//                 ]
+//             ], 400);
+//         }
 
-        $user = $accessToken->tokenable;
+//         $user = $accessToken->tokenable;
 
-        if (!$user) {
-            return response()->json([
-                'error' => 'Utente associato al token non trovato',
-                'debug' => [
-                    'access_token_id' => $accessToken->id,
-                    'tokenable_type' => $accessToken->tokenable_type,
-                    'tokenable_id' => $accessToken->tokenable_id
-                ]
-            ], 400);
-        }
+//         if (!$user) {
+//             return response()->json([
+//                 'error' => 'Utente associato al token non trovato',
+//                 'debug' => [
+//                     'access_token_id' => $accessToken->id,
+//                     'tokenable_type' => $accessToken->tokenable_type,
+//                     'tokenable_id' => $accessToken->tokenable_id
+//                 ]
+//             ], 400);
+//         }
 
-        // Ora generiamo le notifiche
-        $notifications = $user->notifications()->orderBy('created_at', 'desc')->get();
-        $unreadCount = $user->unreadNotifications()->count();
+//         // Ora generiamo le notifiche
+//         $notifications = $user->notifications()->orderBy('created_at', 'desc')->get();
+//         $unreadCount = $user->unreadNotifications()->count();
 
-        $html = "<!DOCTYPE html>
-<html>
-<head>
-    <title>📱 Notifiche Goolliver - {$user->name}</title>
-    <meta charset='utf-8'>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .header { text-align: center; margin-bottom: 30px; color: #333; }
-        .stats { display: flex; justify-content: space-around; margin: 20px 0; background: #e3f2fd; padding: 15px; border-radius: 8px; }
-        .stat { text-align: center; }
-        .stat-number { font-size: 2em; font-weight: bold; color: #1976d2; }
-        .notification { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; transition: transform 0.2s; }
-        .notification:hover { transform: translateY(-2px); }
-        .unread { border-left: 5px solid #ff4444; background: #fff8f8; }
-        .read { border-left: 5px solid #44ff44; opacity: 0.7; }
-        .title { font-weight: bold; margin-bottom: 8px; color: #333; }
-        .message { margin: 10px 0; color: #666; }
-        .meta { font-size: 0.9em; color: #999; }
-        .user-info { background: linear-gradient(45deg, #667eea, #764ba2); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
-        .refresh-btn { position: fixed; bottom: 30px; right: 30px; background: #667eea; color: white; border: none; border-radius: 50px; padding: 15px 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .logout-btn { background: #ff6b6b; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px; }
-    </style>
-</head>
-<body>
-    <div class='container'>
-        <div class='header'>
-            <h1>📱 Notifiche Goolliver</h1>
-        </div>
-        
-        <div class='user-info'>
-            <h2>👤 {$user->name}</h2>
-            <p>📧 {$user->email}</p>
-            <p>🔑 Autenticato con successo!</p>
-            <button class='logout-btn' onclick='logout()'>🚪 Logout</button>
-        </div>
+//         $html = "<!DOCTYPE html>
+// <html>
+// <head>
+//     <title>📱 Notifiche Goolliver - {$user->name}</title>
+//     <meta charset='utf-8'>
+//     <style>
+//         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+//         .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+//         .header { text-align: center; margin-bottom: 30px; color: #333; }
+//         .stats { display: flex; justify-content: space-around; margin: 20px 0; background: #e3f2fd; padding: 15px; border-radius: 8px; }
+//         .stat { text-align: center; }
+//         .stat-number { font-size: 2em; font-weight: bold; color: #1976d2; }
+//         .notification { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; transition: transform 0.2s; }
+//         .notification:hover { transform: translateY(-2px); }
+//         .unread { border-left: 5px solid #ff4444; background: #fff8f8; }
+//         .read { border-left: 5px solid #44ff44; opacity: 0.7; }
+//         .title { font-weight: bold; margin-bottom: 8px; color: #333; }
+//         .message { margin: 10px 0; color: #666; }
+//         .meta { font-size: 0.9em; color: #999; }
+//         .user-info { background: linear-gradient(45deg, #667eea, #764ba2); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+//         .refresh-btn { position: fixed; bottom: 30px; right: 30px; background: #667eea; color: white; border: none; border-radius: 50px; padding: 15px 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+//         .logout-btn { background: #ff6b6b; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px; }
+//     </style>
+// </head>
+// <body>
+//     <div class='container'>
+//         <div class='header'>
+//             <h1>📱 Notifiche Goolliver</h1>
+//         </div>
 
-        <div class='stats'>
-            <div class='stat'>
-                <div class='stat-number'>{$notifications->count()}</div>
-                <div>Totale Notifiche</div>
-            </div>
-            <div class='stat'>
-                <div class='stat-number'>{$unreadCount}</div>
-                <div>Non Lette</div>
-            </div>
-            <div class='stat'>
-                <div class='stat-number'>" . ($notifications->count() - $unreadCount) . "</div>
-                <div>Lette</div>
-            </div>
-        </div>
-        
-        <div class='notifications'>";
+//         <div class='user-info'>
+//             <h2>👤 {$user->name}</h2>
+//             <p>📧 {$user->email}</p>
+//             <p>🔑 Autenticato con successo!</p>
+//             <button class='logout-btn' onclick='logout()'>🚪 Logout</button>
+//         </div>
 
-        if ($notifications->count() > 0) {
-            foreach ($notifications as $notification) {
-                $class = $notification->read_at ? 'read' : 'unread';
-                $status = $notification->read_at ? '✅ Letta' : '🔔 Non letta';
+//         <div class='stats'>
+//             <div class='stat'>
+//                 <div class='stat-number'>{$notifications->count()}</div>
+//                 <div>Totale Notifiche</div>
+//             </div>
+//             <div class='stat'>
+//                 <div class='stat-number'>{$unreadCount}</div>
+//                 <div>Non Lette</div>
+//             </div>
+//             <div class='stat'>
+//                 <div class='stat-number'>" . ($notifications->count() - $unreadCount) . "</div>
+//                 <div>Lette</div>
+//             </div>
+//         </div>
 
-                $safeTitle = htmlspecialchars($notification->title, ENT_QUOTES, 'UTF-8');
-                $safeMessage = htmlspecialchars($notification->message, ENT_QUOTES, 'UTF-8');
+//         <div class='notifications'>";
 
-                $html .= "
-                <div class='notification {$class}'>
-                    <div class='title'>{$safeTitle}</div>
-                    <div class='message'>{$safeMessage}</div>
-                    <div class='meta'>
-                        {$status} - Creata: {$notification->created_at->format('d/m/Y H:i')}
-                    </div>
-                </div>";
-            }
-        } else {
-            $html .= "<div class='notification'><div class='title'>📭 Nessuna notifica</div><div class='message'>Non ci sono notifiche da mostrare al momento.</div></div>";
-        }
+//         if ($notifications->count() > 0) {
+//             foreach ($notifications as $notification) {
+//                 $class = $notification->read_at ? 'read' : 'unread';
+//                 $status = $notification->read_at ? '✅ Letta' : '🔔 Non letta';
 
-        $html .= "
-        </div>
-    </div>
-    
-    <button class='refresh-btn' onclick='location.reload()'>🔄 Aggiorna</button>
-    
-    <script>
-        function logout() {
-            document.cookie = 'auth_token=; path=/; max-age=0';
-            window.location.href = '/api/login-form';
-        }
-    </script>
-</body>
-</html>";
+//                 $safeTitle = htmlspecialchars($notification->title, ENT_QUOTES, 'UTF-8');
+//                 $safeMessage = htmlspecialchars($notification->message, ENT_QUOTES, 'UTF-8');
 
-        return response($html)->header('Content-Type', 'text/html; charset=utf-8');
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => 'Errore nel caricamento delle notifiche',
-            'message' => $e->getMessage(),
-            'debug' => [
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'cookie_token' => $request->cookie('auth_token') ? 'presente' : 'mancante'
-            ]
-        ], 500);
-    }
-});
+//                 $html .= "
+//                 <div class='notification {$class}'>
+//                     <div class='title'>{$safeTitle}</div>
+//                     <div class='message'>{$safeMessage}</div>
+//                     <div class='meta'>
+//                         {$status} - Creata: {$notification->created_at->format('d/m/Y H:i')}
+//                     </div>
+//                 </div>";
+//             }
+//         } else {
+//             $html .= "<div class='notification'><div class='title'>📭 Nessuna notifica</div><div class='message'>Non ci sono notifiche da mostrare al momento.</div></div>";
+//         }
 
-// Rotte Notifiche (richiedono autenticazione)
-Route::middleware('auth:sanctum')->prefix('notifications')->group(function () {
-    Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);                    // Lista notifiche
-    Route::get('/unread-count', [App\Http\Controllers\NotificationController::class, 'unreadCount']);  // Conta non lette
+//         $html .= "
+//         </div>
+//     </div>
 
-    // Route protette da ownership
-    Route::middleware('resource.owner:notification')->group(function () {
+//     <button class='refresh-btn' onclick='location.reload()'>🔄 Aggiorna</button>
+
+//     <script>
+//         function logout() {
+//             document.cookie = 'auth_token=; path=/; max-age=0';
+//             window.location.href = '/api/login-form';
+//         }
+//     </script>
+// </body>
+// </html>";
+
+//         return response($html)->header('Content-Type', 'text/html; charset=utf-8');
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'error' => 'Errore nel caricamento delle notifiche',
+//             'message' => $e->getMessage(),
+//             'debug' => [
+//                 'file' => $e->getFile(),
+//                 'line' => $e->getLine(),
+//                 'cookie_token' => $request->cookie('auth_token') ? 'presente' : 'mancante'
+//             ]
+//         ], 500);
+//     }
+// });
+
+// Rotte per solo admin
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    // ...existing code...
+    // Notifiche admin
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);                    // Lista notifiche
+        Route::get('/unread-count', [App\Http\Controllers\NotificationController::class, 'unreadCount']);  // Conta non lette
         Route::get('/{id}', [App\Http\Controllers\NotificationController::class, 'show']);                 // Singola notifica
         Route::patch('/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);    // Segna come letta
         Route::patch('/{id}/unread', [App\Http\Controllers\NotificationController::class, 'markAsUnread']); // Segna come non letta
         Route::delete('/{id}', [App\Http\Controllers\NotificationController::class, 'destroy']);           // Elimina notifica
+        Route::patch('/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']); // Tutte lette (sicura)
+        Route::delete('/read/all', [App\Http\Controllers\NotificationController::class, 'deleteRead']);    // Elimina tutte lette (sicura)
     });
-
-    Route::patch('/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']); // Tutte lette (sicura)
-    Route::delete('/read/all', [App\Http\Controllers\NotificationController::class, 'deleteRead']);    // Elimina tutte lette (sicura)
+    // ...existing code...
 });
 
 // Rotte Test Notifiche (per sviluppo)
@@ -529,6 +529,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Gestione contest
     Route::get('/contests', [AdminController::class, 'contests']);
     Route::get('/contests/{contestId}/details', [AdminController::class, 'contestDetails']);
+
+    // Avvio votazione contest (POST)
+    Route::post('/contests/{contestId}/start-voting', [AdminController::class, 'setVotingDays']);
+    Route::post('/contests/{contestId}/set-voting-days', [AdminController::class, 'setVotingDays']);
 
     // Analytics crediti
     Route::get('/credits/analytics', [AdminController::class, 'creditAnalytics']);
