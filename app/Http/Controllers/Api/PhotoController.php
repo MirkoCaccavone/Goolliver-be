@@ -48,16 +48,18 @@ class PhotoController extends Controller
         $contests = \App\Models\Contest::whereIn('status', ['active', 'pending_voting', 'voting'])->get();
 
         $photos = [];
+
         foreach ($contests as $contest) {
             // Recupera solo le entries con photo_url e moderation_status 'approved'
             $entries = $contest->entries()
                 ->whereNotNull('photo_url')
                 ->where('moderation_status', 'approved')
-                ->get(['id', 'photo_url']);
+                ->get(['id', 'photo_url', 'contest_id']);
             foreach ($entries as $entry) {
                 $photos[] = [
                     'id' => $entry->id,
                     'photo_url' => $entry->photo_url,
+                    'contest_id' => $entry->contest_id,
                 ];
             }
         }
