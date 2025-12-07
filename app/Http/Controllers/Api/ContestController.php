@@ -13,7 +13,11 @@ use App\Models\Vote;
 class ContestController extends Controller
 {
     /**
-     * Aggiorna lo stato dei contest: upcoming -> active se la data di inizio è oggi/passata
+     * Aggiorna lo stato dei contest:
+     * - upcoming -> active se la data di inizio è oggi/passata
+     * - active -> pending_voting se raggiunto il numero massimo di partecipanti
+     * - pending_voting -> voting quando l'admin avvia la votazione
+     * - voting -> ended SOLO quando la data odierna supera voting_end_date
      */
     public static function updateContestStatuses()
     {
@@ -51,7 +55,7 @@ class ContestController extends Controller
             }
         }
 
-        // voting -> ended se la voting_end_date è passata
+        // voting -> ended SOLO quando la voting_end_date è passata
         Contest::where('status', 'voting')
             ->whereNotNull('voting_end_date')
             ->where('voting_end_date', '<', $now)
